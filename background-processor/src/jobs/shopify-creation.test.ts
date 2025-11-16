@@ -3,7 +3,7 @@ import { createVariant } from './shopify-creation.js';
 
 // Mock environment variables
 process.env.SHOPIFY_SHOP_DOMAIN = 'vbxsb1-cr.myshopify.com';
-process.env.SHOPIFY_ACCESS_TOKEN = 'TODO;
+process.env.SHOPIFY_ACCESS_TOKEN = 'TODO';
 process.env.SHOPIFY_API_VERSION = '2025-10';
 
 
