@@ -41,29 +41,62 @@ const COLOR_NAMES: Record<string, string> = {
     'Multi-Color': 'Multi-Color'
 };
 
-function mapRgbToColorName(rgb: { r: number; g: number; b: number }): string {
-    const references: Record<string, { r: number; g: number; b: number }> = {
-        'Red': {r: 255, g: 0, b: 0},
-        'Orange': {r: 255, g: 165, b: 0},
-        'Yellow': {r: 255, g: 255, b: 0},
-        'Green': {r: 0, g: 255, b: 0},
-        'Blue': {r: 0, g: 0, b: 255},
-        'Purple': {r: 128, g: 0, b: 128},
-        'Pink': {r: 255, g: 192, b: 203},
-        'White': {r: 255, g: 255, b: 255},
-        'Black': {r: 0, g: 0, b: 0},
-        'Gray': {r: 128, g: 128, b: 128},
-        'Brown': {r: 139, g: 69, b: 19}
-    };
+/**
+ * RGB reference values for common color names
+ */
+const COLOR_RGB_REFERENCES: Record<string, { r: number; g: number; b: number }> = {
+    'Red': {r: 255, g: 0, b: 0},
+    'Orange': {r: 255, g: 165, b: 0},
+    'Yellow': {r: 255, g: 255, b: 0},
+    'Green': {r: 0, g: 255, b: 0},
+    'Blue': {r: 0, g: 0, b: 255},
+    'Purple': {r: 128, g: 0, b: 128},
+    'Pink': {r: 255, g: 192, b: 203},
+    'White': {r: 255, g: 255, b: 255},
+    'Black': {r: 0, g: 0, b: 0},
+    'Gray': {r: 128, g: 128, b: 128},
+    'Brown': {r: 139, g: 69, b: 19}
+};
+
+/**
+ * Extracts unique color values from product variants
+ */
+function getAvailableColors(variants: any[]): string[] {
+    const colors = new Set<string>();
+    for (const variant of variants) {
+        if (variant.option1) {
+            colors.add(variant.option1);
+        }
+    }
+    return Array.from(colors);
+}
+
+/**
+ * Matches an estimated RGB color to the closest available color from the product's variants
+ */
+function matchToAvailableColor(
+    estimatedRgb: { r: number; g: number; b: number },
+    availableColors: string[]
+): string {
+    if (availableColors.length === 0) {
+        return 'Multi-Color'; // Fallback
+    }
+
+    if (availableColors.length === 1) {
+        return availableColors[0]; // Only one option
+    }
 
     let minDistance = Infinity;
-    let closestColor = 'Multi-Color';
+    let closestColor = availableColors[0];
 
-    for (const [colorName, refRgb] of Object.entries(references)) {
+    for (const colorName of availableColors) {
+        // Get RGB reference for this color name, or use a gray default
+        const refRgb = COLOR_RGB_REFERENCES[colorName] || {r: 128, g: 128, b: 128};
+
         const distance = Math.sqrt(
-            Math.pow(rgb.r - refRgb.r, 2) +
-            Math.pow(rgb.g - refRgb.g, 2) +
-            Math.pow(rgb.b - refRgb.b, 2)
+            Math.pow(estimatedRgb.r - refRgb.r, 2) +
+            Math.pow(estimatedRgb.g - refRgb.g, 2) +
+            Math.pow(estimatedRgb.b - refRgb.b, 2)
         );
 
         if (distance < minDistance) {
@@ -230,12 +263,16 @@ export async function runShopifyCreationJob(): Promise<void> {
                 const imageBuffer = await getProductImage(task.userId, task.aggregateId);
                 const imageBase64 = imageBuffer.toString('base64');
 
-                // Map color
-                const colorName = mapRgbToColorName(details.color);
-                console.log(`[Shopify Creation] Mapped color: ${colorName}`);
-
-                // Get existing variants
+                // Get existing variants to determine available colors and weights
                 const existingVariants = await getExistingVariants(details.shopifyProductId);
+
+                // Extract available colors for this product
+                const availableColors = getAvailableColors(existingVariants);
+                console.log(`[Shopify Creation] Available colors for product: ${availableColors.join(', ')}`);
+
+                // Match estimated RGB to closest available color
+                const colorName = matchToAvailableColor(details.color, availableColors);
+                console.log(`[Shopify Creation] Matched RGB(${details.color.r},${details.color.g},${details.color.b}) to: ${colorName}`);
 
                 // Make weight unique
                 const uniqueWeight = makeWeightUnique(details.weight, existingVariants);
