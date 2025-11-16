@@ -4,9 +4,10 @@ export function replayEvents(events: Event[]): ProductState {
   let state: ProductState = { status: 'not-started' };
 
   for (const event of events) {
-    const eventData = JSON.parse(event.eventData);
+    console.log('***2112 event', event);
+    const eventData = JSON.parse(event.event_data);
 
-    switch (event.eventType) {
+    switch (event.event_type) {
       case 'BeginProductCreated':
         state = {
           ...state,

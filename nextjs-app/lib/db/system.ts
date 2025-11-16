@@ -2,10 +2,13 @@ import Database from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
 
-const DATABASE_PATH = process.env.DATABASE_PATH || './data/system.db';
+function getDatabasePath(): string {
+  const DATABASE_PATH = process.env.DATABASE_PATH || './data/system.db';
+  return DATABASE_PATH;
+}
 
 // Ensure data directory exists
-const dataDir = path.dirname(DATABASE_PATH);
+const dataDir = path.dirname(getDatabasePath());
 if (!fs.existsSync(dataDir)) {
   fs.mkdirSync(dataDir, { recursive: true });
 }

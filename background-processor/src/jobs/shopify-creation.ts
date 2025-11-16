@@ -6,9 +6,20 @@ import {
   recordProductFailed
 } from '../utils/api-client.js';
 
-const SHOPIFY_SHOP_DOMAIN = process.env.SHOPIFY_SHOP_DOMAIN || '';
-const SHOPIFY_ACCESS_TOKEN = process.env.SHOPIFY_ACCESS_TOKEN || '';
-const SHOPIFY_API_VERSION = process.env.SHOPIFY_API_VERSION || '2024-10';
+function getShopifyShopDomain(): string {
+  const SHOPIFY_SHOP_DOMAIN = process.env.SHOPIFY_SHOP_DOMAIN || '';
+  return SHOPIFY_SHOP_DOMAIN;
+}
+
+function getShopifyAccessToken(): string {
+  const SHOPIFY_ACCESS_TOKEN = process.env.SHOPIFY_ACCESS_TOKEN || '';
+  return SHOPIFY_ACCESS_TOKEN;
+}
+
+function getShopifyApiVersion(): string {
+  const SHOPIFY_API_VERSION = process.env.SHOPIFY_API_VERSION || '2024-10';
+  return SHOPIFY_API_VERSION;
+}
 
 const COLOR_NAMES: Record<string, string> = {
   'Red': 'Red',
@@ -61,10 +72,10 @@ function mapRgbToColorName(rgb: { r: number; g: number; b: number }): string {
 
 async function getExistingVariants(productId: string): Promise<any[]> {
   const response = await fetch(
-    `https://${SHOPIFY_SHOP_DOMAIN}/admin/api/${SHOPIFY_API_VERSION}/products/${productId}/variants.json`,
+    `https://${getShopifyShopDomain()}/admin/api/${getShopifyApiVersion()}/products/${productId}/variants.json`,
     {
       headers: {
-        'X-Shopify-Access-Token': SHOPIFY_ACCESS_TOKEN
+        'X-Shopify-Access-Token': getShopifyAccessToken()
       }
     }
   );
@@ -79,11 +90,11 @@ async function getExistingVariants(productId: string): Promise<any[]> {
 
 async function uploadImage(productId: string, imageBase64: string): Promise<string> {
   const response = await fetch(
-    `https://${SHOPIFY_SHOP_DOMAIN}/admin/api/${SHOPIFY_API_VERSION}/products/${productId}/images.json`,
+    `https://${getShopifyShopDomain()}/admin/api/${getShopifyApiVersion()}/products/${productId}/images.json`,
     {
       method: 'POST',
       headers: {
-        'X-Shopify-Access-Token': SHOPIFY_ACCESS_TOKEN,
+        'X-Shopify-Access-Token': getShopifyAccessToken(),
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
@@ -110,11 +121,11 @@ async function createVariant(
   imageId: string
 ): Promise<string> {
   const response = await fetch(
-    `https://${SHOPIFY_SHOP_DOMAIN}/admin/api/${SHOPIFY_API_VERSION}/products/${productId}/variants.json`,
+    `https://${getShopifyShopDomain()}/admin/api/${getShopifyApiVersion()}/products/${productId}/variants.json`,
     {
       method: 'POST',
       headers: {
-        'X-Shopify-Access-Token': SHOPIFY_ACCESS_TOKEN,
+        'X-Shopify-Access-Token': getShopifyAccessToken(),
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({

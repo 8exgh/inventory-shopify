@@ -1,7 +1,14 @@
 import fetch from 'node-fetch';
 
-const API_URL = process.env.NEXTJS_API_URL || 'http://localhost:3000';
-const API_KEY = process.env.NEXTJS_API_KEY || '';
+function getApiUrl(): string {
+  const API_URL = process.env.NEXTJS_API_URL || 'http://localhost:3000';
+  return API_URL;
+}
+
+function getApiKey(): string {
+  const API_KEY = process.env.NEXTJS_API_KEY || '';
+  return API_KEY;
+}
 
 export interface ProductTask {
   userId: string;
@@ -16,13 +23,18 @@ export interface ProductDetails {
 }
 
 export async function getProductsNeedingColorEstimation(): Promise<ProductTask[]> {
-  const response = await fetch(`${API_URL}/api/queries/products-needing-color-estimation`, {
-    headers: { 'X-API-Key': API_KEY }
+  const response = await fetch(`${getApiUrl()}/api/queries/products-needing-color-estimation`, {
+    headers: { 'X-API-Key':  getApiKey() },
   });
 
+  console.log('***1');
+
   if (!response.ok) {
+    console.log('***2');
     throw new Error(`Failed to get products: ${response.statusText}`);
   }
+
+  console.log('***3');
 
   const data = await response.json() as any;
   return data.tasks;
@@ -30,8 +42,8 @@ export async function getProductsNeedingColorEstimation(): Promise<ProductTask[]
 
 export async function getProductImage(userId: string, aggregateId: string): Promise<Buffer> {
   const response = await fetch(
-    `${API_URL}/api/queries/product-image?userId=${userId}&aggregateId=${aggregateId}`,
-    { headers: { 'X-API-Key': API_KEY } }
+    `${getApiUrl()}/api/queries/product-image?userId=${userId}&aggregateId=${aggregateId}`,
+    { headers: { 'X-API-Key': getApiKey() } }
   );
 
   if (!response.ok) {
@@ -47,10 +59,10 @@ export async function recordProductColor(
   aggregateId: string,
   color: { r: number; g: number; b: number }
 ): Promise<void> {
-  const response = await fetch(`${API_URL}/api/commands/record-product-color`, {
+  const response = await fetch(`${getApiUrl()}/api/commands/record-product-color`, {
     method: 'POST',
     headers: {
-      'X-API-Key': API_KEY,
+      'X-API-Key': getApiKey(),
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({ userId, aggregateId, color })
@@ -62,8 +74,8 @@ export async function recordProductColor(
 }
 
 export async function getProductsToCreateInShopify(): Promise<ProductTask[]> {
-  const response = await fetch(`${API_URL}/api/queries/products-to-create-in-shopify`, {
-    headers: { 'X-API-Key': API_KEY }
+  const response = await fetch(`${getApiUrl()}/api/queries/products-to-create-in-shopify`, {
+    headers: { 'X-API-Key': getApiKey() },
   });
 
   if (!response.ok) {
@@ -79,8 +91,8 @@ export async function getProductDetailsForShopify(
   aggregateId: string
 ): Promise<ProductDetails> {
   const response = await fetch(
-    `${API_URL}/api/queries/product-details-for-shopify?userId=${userId}&aggregateId=${aggregateId}`,
-    { headers: { 'X-API-Key': API_KEY } }
+    `${getApiUrl()}/api/queries/product-details-for-shopify?userId=${userId}&aggregateId=${aggregateId}`,
+    { headers: { 'X-API-Key': getApiKey() } }
   );
 
   if (!response.ok) {
@@ -95,10 +107,10 @@ export async function recordProductCreated(
   aggregateId: string,
   shopifyVariantId: string
 ): Promise<void> {
-  const response = await fetch(`${API_URL}/api/commands/record-product-created-in-shopify`, {
+  const response = await fetch(`${getApiUrl()}/api/commands/record-product-created-in-shopify`, {
     method: 'POST',
     headers: {
-      'X-API-Key': API_KEY,
+      'X-API-Key': getApiKey(),
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({
@@ -120,10 +132,10 @@ export async function recordProductFailed(
   errorMessage: string,
   attemptNumber: number
 ): Promise<void> {
-  const response = await fetch(`${API_URL}/api/commands/record-product-failed-in-shopify`, {
+  const response = await fetch(`${getApiUrl()}/api/commands/record-product-failed-in-shopify`, {
     method: 'POST',
     headers: {
-      'X-API-Key': API_KEY,
+      'X-API-Key': getApiKey(),
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({

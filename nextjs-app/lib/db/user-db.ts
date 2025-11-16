@@ -3,18 +3,21 @@ import path from 'path';
 import fs from 'fs';
 import { Event } from '@/types/events';
 
-const USER_DATABASES_PATH = process.env.USER_DATABASES_PATH || './data/users';
+function getUserDatabasePath(): string {
+  const USER_DATABASES_PATH = process.env.USER_DATABASES_PATH || './data/users';
+  return USER_DATABASES_PATH;
+}
 
 // Ensure users directory exists
-if (!fs.existsSync(USER_DATABASES_PATH)) {
-  fs.mkdirSync(USER_DATABASES_PATH, { recursive: true });
+if (!fs.existsSync(getUserDatabasePath())) {
+  fs.mkdirSync(getUserDatabasePath(), { recursive: true });
 }
 
 const userDbs: Map<string, Database.Database> = new Map();
 
 export function getUserDb(userId: string): Database.Database {
   if (!userDbs.has(userId)) {
-    const dbPath = path.join(USER_DATABASES_PATH, `${userId}.db`);
+    const dbPath = path.join(getUserDatabasePath(), `${userId}.db`);
     const db = new Database(dbPath);
     initializeUserDb(db);
     userDbs.set(userId, db);
@@ -103,11 +106,11 @@ export function getEventCount(userId: string, aggregateId: string, eventType: st
 }
 
 export function getAllUserDatabases(): string[] {
-  if (!fs.existsSync(USER_DATABASES_PATH)) {
+  if (!fs.existsSync(getUserDatabasePath())) {
     return [];
   }
 
-  const files = fs.readdirSync(USER_DATABASES_PATH);
+  const files = fs.readdirSync(getUserDatabasePath());
   return files
     .filter(file => file.endsWith('.db'))
     .map(file => file.replace('.db', ''));

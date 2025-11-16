@@ -5,13 +5,15 @@ import { runShopifyCreationJob } from './jobs/shopify-creation.js';
 // Load environment variables
 dotenv.config();
 
-const POLLING_INTERVAL_MS = parseInt(process.env.POLLING_INTERVAL_MS || '5000', 10);
-
+function getPollingIntervalms(): number {
+  const POLLING_INTERVAL_MS = parseInt(process.env.POLLING_INTERVAL_MS || '5000', 10);
+  return POLLING_INTERVAL_MS;
+}
 console.log('=================================');
 console.log('Background Processor Starting');
 console.log('=================================');
 console.log(`NextJS API URL: ${process.env.NEXTJS_API_URL}`);
-console.log(`Polling Interval: ${POLLING_INTERVAL_MS}ms`);
+console.log(`Polling Interval: ${getPollingIntervalms()}ms`);
 console.log('=================================');
 
 async function sleep(ms: number): Promise<void> {
@@ -35,7 +37,7 @@ async function runJobLoop(): Promise<void> {
     }
 
     // Wait before next cycle
-    await sleep(POLLING_INTERVAL_MS);
+    await sleep(getPollingIntervalms());
   }
 }
 

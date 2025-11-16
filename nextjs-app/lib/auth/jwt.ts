@@ -1,7 +1,14 @@
 import jwt from 'jsonwebtoken';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-in-production';
-const JWT_EXPIRATION = process.env.JWT_EXPIRATION || '7d';
+function getJwtSecret(): string {
+  const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-in-production';
+  return JWT_SECRET;
+}
+
+function getJwtExpiration(): string {
+  const JWT_EXPIRATION = process.env.JWT_EXPIRATION || '7d';
+  return JWT_EXPIRATION;
+}
 
 export interface JWTPayload {
   userId: string;
@@ -10,12 +17,12 @@ export interface JWTPayload {
 }
 
 export function signToken(payload: Omit<JWTPayload, 'exp'>): string {
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRATION });
+  return jwt.sign(payload, getJwtSecret(), { expiresIn: getJwtExpiration() });
 }
 
 export function verifyToken(token: string): JWTPayload | null {
   try {
-    return jwt.verify(token, JWT_SECRET) as JWTPayload;
+    return jwt.verify(token, getJwtSecret()) as JWTPayload;
   } catch (error) {
     return null;
   }

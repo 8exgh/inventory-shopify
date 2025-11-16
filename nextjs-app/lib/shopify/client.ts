@@ -1,22 +1,33 @@
-import { shopifyApi, LATEST_API_VERSION } from '@shopify/shopify-api';
+import { shopifyApi } from '@shopify/shopify-api';
 import '@shopify/shopify-api/adapters/node';
 
-const SHOPIFY_SHOP_DOMAIN = process.env.SHOPIFY_SHOP_DOMAIN || '';
-const SHOPIFY_ACCESS_TOKEN = process.env.SHOPIFY_ACCESS_TOKEN || '';
-const SHOPIFY_API_VERSION = process.env.SHOPIFY_API_VERSION || '2024-10';
+function getShopifyShopDomain(): string {
+  const SHOPIFY_SHOP_DOMAIN = process.env.SHOPIFY_SHOP_DOMAIN || '';
+  return SHOPIFY_SHOP_DOMAIN;
+}
+
+function getShopifyAccessToken(): string {
+  const SHOPIFY_ACCESS_TOKEN = process.env.SHOPIFY_ACCESS_TOKEN || '';
+  return SHOPIFY_ACCESS_TOKEN;;
+}
+
+function getShopifyApiVersion(): string {
+  const SHOPIFY_API_VERSION = process.env.SHOPIFY_API_VERSION || '2025-10';
+  return SHOPIFY_API_VERSION;
+}
 
 const shopify = shopifyApi({
   apiKey: 'not-needed-for-custom-app',
   apiSecretKey: 'not-needed-for-custom-app',
   scopes: ['read_products', 'write_products', 'write_files'],
-  hostName: SHOPIFY_SHOP_DOMAIN.replace('.myshopify.com', ''),
-  apiVersion: SHOPIFY_API_VERSION as any,
+  hostName: getShopifyShopDomain().replace('.myshopify.com', ''),
+  apiVersion: getShopifyApiVersion() as any,
   isEmbeddedApp: false,
 });
 
 const session = {
-  shop: SHOPIFY_SHOP_DOMAIN,
-  accessToken: SHOPIFY_ACCESS_TOKEN,
+  shop: getShopifyShopDomain(),
+  accessToken: getShopifyAccessToken(),
   state: 'active',
   isOnline: false,
   scope: 'read_products,write_products,write_files'
@@ -51,9 +62,9 @@ export class ShopifyClient {
   private headers: Record<string, string>;
 
   constructor() {
-    this.baseUrl = `https://${SHOPIFY_SHOP_DOMAIN}/admin/api/${SHOPIFY_API_VERSION}`;
+    this.baseUrl = `https://${getShopifyShopDomain()}/admin/api/${getShopifyApiVersion()}`;
     this.headers = {
-      'X-Shopify-Access-Token': SHOPIFY_ACCESS_TOKEN,
+      'X-Shopify-Access-Token': getShopifyAccessToken(),
       'Content-Type': 'application/json',
     };
   }

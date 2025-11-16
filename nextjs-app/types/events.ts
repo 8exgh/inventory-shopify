@@ -40,12 +40,13 @@ export type EventData =
   | ProductCreatedData
   | ProductCreateFailedData;
 
+// Matches database columns with snake case
 export interface Event {
   id: number;
-  aggregateId: string;
-  eventType: EventType;
-  eventData: string; // JSON
-  photoBlob: Buffer | null;
+  aggregate_id: string;
+  event_type: EventType;
+  event_data: string; // JSON
+  photo_blob: Buffer | null;
   timestamp: number;
   version: number;
 }

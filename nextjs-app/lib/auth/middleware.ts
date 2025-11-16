@@ -1,7 +1,10 @@
 import { NextRequest } from 'next/server';
 import { verifyToken, JWTPayload } from './jwt';
 
-const BACKGROUND_PROCESSOR_API_KEY = process.env.BACKGROUND_PROCESSOR_API_KEY;
+function getBackgroundProcessorApiKey(): string {
+  const BACKGROUND_PROCESSOR_API_KEY = process.env.BACKGROUND_PROCESSOR_API_KEY;
+  return BACKGROUND_PROCESSOR_API_KEY;
+}
 
 export interface AuthResult {
   authenticated: boolean;
@@ -12,9 +15,11 @@ export interface AuthResult {
 }
 
 export function authenticateRequest(request: NextRequest): AuthResult {
+  console.log('***4');
   // Check for API Key first
   const apiKey = request.headers.get('X-API-Key');
-  if (apiKey && apiKey === BACKGROUND_PROCESSOR_API_KEY) {
+  console.log(`***x-api-key ${apiKey}`)
+  if (apiKey && apiKey === getBackgroundProcessorApiKey()) {
     return { authenticated: true, isApiKey: true };
   }
 
@@ -66,7 +71,7 @@ export function requireAdmin(request: NextRequest): AuthResult {
 
 export function requireApiKey(request: NextRequest): AuthResult {
   const apiKey = request.headers.get('X-API-Key');
-  if (!apiKey || apiKey !== BACKGROUND_PROCESSOR_API_KEY) {
+  if (!apiKey || apiKey !== getBackgroundProcessorApiKey()) {
     return { authenticated: false, error: 'Valid API key required' };
   }
 
