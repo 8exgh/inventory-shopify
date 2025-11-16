@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server';
 import { verifyToken, JWTPayload } from './jwt';
 
 function getBackgroundProcessorApiKey(): string {
-  const BACKGROUND_PROCESSOR_API_KEY = process.env.BACKGROUND_PROCESSOR_API_KEY;
+  const BACKGROUND_PROCESSOR_API_KEY = process.env.BACKGROUND_PROCESSOR_API_KEY || 'TODO';
   return BACKGROUND_PROCESSOR_API_KEY;
 }
 

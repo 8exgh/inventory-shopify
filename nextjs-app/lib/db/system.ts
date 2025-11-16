@@ -26,7 +26,7 @@ let db: Database.Database | null = null;
 
 export function getSystemDb(): Database.Database {
   if (!db) {
-    db = new Database(DATABASE_PATH);
+    db = new Database(getDatabasePath());
     initializeSystemDb(db);
   }
   return db;

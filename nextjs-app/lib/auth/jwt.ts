@@ -1,14 +1,18 @@
-import jwt from 'jsonwebtoken';
+import jwt, { SignOptions } from 'jsonwebtoken';
 
+// Make sure getJwtSecret() is typed correctly
 function getJwtSecret(): string {
-  const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-in-production';
-  return JWT_SECRET;
+    const secret = process.env.JWT_SECRET;
+    if (!secret) {
+        throw new Error('JWT_SECRET is not defined');
+    }
+    return secret;  // Explicitly return string, not string | undefined
 }
 
 function getJwtExpiration(): string {
-  const JWT_EXPIRATION = process.env.JWT_EXPIRATION || '7d';
-  return JWT_EXPIRATION;
+    return process.env.JWT_EXPIRATION || '7d';
 }
+
 
 export interface JWTPayload {
   userId: string;
@@ -16,10 +20,16 @@ export interface JWTPayload {
   exp?: number;
 }
 
-export function signToken(payload: Omit<JWTPayload, 'exp'>): string {
-  return jwt.sign(payload, getJwtSecret(), { expiresIn: getJwtExpiration() });
-}
 
+// export function signToken(payload: Omit<JWTPayload, 'exp'>): string {
+//   return jwt.sign(payload, getJwtSecret(), { expiresIn: getJwtExpiration() });
+// }
+
+export function signToken(payload: Omit<JWTPayload, 'exp'>): string {
+    return (jwt.sign as any)(payload, getJwtSecret(), {
+        expiresIn: getJwtExpiration()
+    });
+}
 export function verifyToken(token: string): JWTPayload | null {
   try {
     return jwt.verify(token, getJwtSecret()) as JWTPayload;
