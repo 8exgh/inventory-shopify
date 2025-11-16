@@ -35,14 +35,23 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // This was the original return code before fixing typescript error:
     // Return binary image data
-    return new NextResponse(image.blob, {
-      status: 200,
-      headers: {
-        'Content-Type': image.mimeType,
-        'Cache-Control': 'public, max-age=31536000, immutable'
-      }
-    });
+    // return new NextResponse(image.blob, {
+    //   status: 200,
+    //   headers: {
+    //     'Content-Type': image.mimeType,
+    //     'Cache-Control': 'public, max-age=31536000, immutable'
+    //   }
+    // });
+
+      return new NextResponse(new Uint8Array(image.blob), {
+          status: 200,
+          headers: {
+              'Content-Type': image.mimeType,
+          }
+      });
+
   } catch (error: any) {
     console.error('Get product image error:', error);
     return NextResponse.json(
