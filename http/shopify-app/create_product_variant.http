@@ -1,0 +1,15 @@
+### Create Shopify Product Variant
+POST https://{{shopifyShopDomain}}/admin/api/{{shopifyApiVersion}}/products/{{productId}}/variants.json
+X-Shopify-Access-Token: {{shopifyAccessToken}}
+Content-Type: application/json
+
+{
+  "variant": {
+    "option1": "Green" ,
+     "option2": "6kg",
+    "inventory_quantity": 1,
+    "inventory_management": "shopify",
+    "inventory_policy": "deny",
+    "image_id": "{{imageId}}"
+  }
+}

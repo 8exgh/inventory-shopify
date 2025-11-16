@@ -114,7 +114,7 @@ async function uploadImage(productId: string, imageBase64: string): Promise<stri
   return data.image.id.toString();
 }
 
-async function createVariant(
+export async function createVariant(
   productId: string,
   colorName: string,
   weight: string,

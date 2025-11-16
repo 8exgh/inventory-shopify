@@ -1,0 +1,54 @@
+### Variables
+@shopifyShopDomain = vbxsb1-cr.myshopify.com
+@shopifyAccessToken =  {{shopifyAccessToken}}
+@shopifyApiVersion = 2025-10
+@productId = 7543276372064
+@colorName = Green
+@weight = 12kg
+@imageId = 123
+
+### Step 1: Get Location ID (run this once to get your location_id)
+GET https://{{shopifyShopDomain}}/admin/api/{{shopifyApiVersion}}/locations.json
+X-Shopify-Access-Token: {{shopifyAccessToken}}
+
+> {%
+    client.global.set("locationId", response.body.locations[0].id.toString());
+    client.log("Location ID: " + response.body.locations[0].id);
+%}
+
+###
+
+### Step 2: Create Variant
+POST https://{{shopifyShopDomain}}/admin/api/{{shopifyApiVersion}}/products/{{productId}}/variants.json
+X-Shopify-Access-Token: {{shopifyAccessToken}}
+Content-Type: application/json
+
+{
+  "variant": {
+    "option1": "{{colorName}}",
+    "option2": "{{weight}}",
+    "inventory_management": "shopify",
+    "inventory_policy": "deny",
+    "image_id": {{imageId}}
+  }
+}
+
+> {%
+    client.global.set("inventoryItemId", response.body.variant.inventory_item_id.toString());
+    client.global.set("variantId", response.body.variant.id.toString());
+    client.log("Variant ID: " + response.body.variant.id);
+    client.log("Inventory Item ID: " + response.body.variant.inventory_item_id);
+%}
+
+###
+
+### Step 3: Set Inventory Quantity to 1
+POST https://{{shopifyShopDomain}}/admin/api/{{shopifyApiVersion}}/inventory_levels/set.json
+X-Shopify-Access-Token: {{shopifyAccessToken}}
+Content-Type: application/json
+
+{
+  "location_id": {{locationId}},
+  "inventory_item_id": {{inventoryItemId}},
+  "available": 1
+}

@@ -35,6 +35,8 @@ A complete CQRS + Event Sourcing system for managing disc golf inventory on Shop
    - `read_products`
    - `write_products`
    - `write_files`
+   - `read_locations`
+   - `write_inventory`
 4. Install the app and copy the access token
 
 ### 2. Generate Secrets

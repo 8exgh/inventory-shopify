@@ -1,0 +1,3 @@
+### Get All Products
+GET https://{{shopifyShopDomain}}/admin/api/{{shopifyApiVersion}}/products.json
+X-Shopify-Access-Token: {{shopifyAccessToken}}
