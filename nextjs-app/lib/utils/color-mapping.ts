@@ -40,3 +40,43 @@ export function mapRgbToColorName(rgb: { r: number; g: number; b: number }): Col
 export function getColorNames(): ColorName[] {
   return Object.keys(COLOR_REFERENCES) as ColorName[];
 }
+
+/**
+ * Matches an estimated RGB color to the closest available color from a product's variants
+ * @param estimatedRgb The RGB color estimated from the photo
+ * @param availableColors Array of color names available for this product
+ * @returns The closest matching color from the available colors
+ */
+export function matchToAvailableColor(
+  estimatedRgb: { r: number; g: number; b: number },
+  availableColors: string[]
+): string {
+  if (availableColors.length === 0) {
+    return 'Multi-Color'; // Fallback
+  }
+
+  if (availableColors.length === 1) {
+    return availableColors[0]; // Only one option
+  }
+
+  let minDistance = Infinity;
+  let closestColor = availableColors[0];
+
+  for (const colorName of availableColors) {
+    // Get RGB reference for this color name, or use a default
+    const refRgb = COLOR_REFERENCES[colorName as ColorName] || { r: 128, g: 128, b: 128 };
+
+    const distance = Math.sqrt(
+      Math.pow(estimatedRgb.r - refRgb.r, 2) +
+      Math.pow(estimatedRgb.g - refRgb.g, 2) +
+      Math.pow(estimatedRgb.b - refRgb.b, 2)
+    );
+
+    if (distance < minDistance) {
+      minDistance = distance;
+      closestColor = colorName;
+    }
+  }
+
+  return closestColor;
+}

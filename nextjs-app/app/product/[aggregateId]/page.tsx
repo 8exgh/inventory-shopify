@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { getColorNames } from '@/lib/utils/color-mapping';
+import { matchToAvailableColor } from '@/lib/utils/color-mapping';
 
 interface ProductState {
   status: string;
@@ -16,12 +16,21 @@ interface ProductState {
 export default function ProductDetail() {
   const [productState, setProductState] = useState<ProductState | null>(null);
   const [selectedColor, setSelectedColor] = useState('');
+  const [availableColors, setAvailableColors] = useState<string[]>([]);
   const [weight, setWeight] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const router = useRouter();
   const params = useParams();
   const aggregateId = params.aggregateId as string;
+
+  // Load available colors from localStorage on mount
+  useEffect(() => {
+    const storedColors = localStorage.getItem(`colors-${aggregateId}`);
+    if (storedColors) {
+      setAvailableColors(JSON.parse(storedColors));
+    }
+  }, [aggregateId]);
 
   useEffect(() => {
     loadProductState();
@@ -43,10 +52,10 @@ export default function ProductDetail() {
         const data = await response.json();
         setProductState(data);
 
-        // If color is estimated and not yet selected, pre-select it
-        if (data.color && !selectedColor) {
-          // Map RGB to color name - simplified for now
-          setSelectedColor('Blue'); // TODO: Map actual color
+        // If color is estimated and not yet selected, match to available colors
+        if (data.color && !selectedColor && availableColors.length > 0) {
+          const matchedColor = matchToAvailableColor(data.color, availableColors);
+          setSelectedColor(matchedColor);
         }
       }
     } catch (error) {
@@ -174,9 +183,13 @@ export default function ProductDetail() {
                     onChange={(e) => handleColorChange(e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
                   >
-                    {getColorNames().map(color => (
-                      <option key={color} value={color}>{color}</option>
-                    ))}
+                    {availableColors.length > 0 ? (
+                      availableColors.map(color => (
+                        <option key={color} value={color}>{color}</option>
+                      ))
+                    ) : (
+                      <option value="">Loading colors...</option>
+                    )}
                   </select>
                 ) : (
                   <div className="text-gray-600">Estimating color...</div>

@@ -190,6 +190,20 @@ export class ShopifyClient {
       inventory_quantity: v.inventory_quantity || 0
     };
   }
+
+  async getProductColors(productId: string): Promise<string[]> {
+    const variants = await this.getVariants(productId);
+
+    // Extract unique color values from option1
+    const colors = new Set<string>();
+    for (const variant of variants) {
+      if (variant.option1) {
+        colors.add(variant.option1);
+      }
+    }
+
+    return Array.from(colors).sort();
+  }
 }
 
 export const shopifyClient = new ShopifyClient();

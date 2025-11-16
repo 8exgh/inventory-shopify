@@ -86,6 +86,21 @@ export default function CreateProduct() {
         return;
       }
 
+      // Fetch available colors for this product and store them
+      try {
+        const colorsResponse = await fetch(`/api/queries/product-colors?productId=${selectedProduct.id}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (colorsResponse.ok) {
+          const colorsData = await colorsResponse.json();
+          localStorage.setItem(`colors-${aggregateId}`, JSON.stringify(colorsData.colors));
+        }
+      } catch (error) {
+        console.error('Failed to fetch colors:', error);
+        // Continue anyway - the product page will handle missing colors
+      }
+
       // Navigate to product detail page
       router.push(`/product/${aggregateId}`);
     } catch (error: any) {
