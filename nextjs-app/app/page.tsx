@@ -29,6 +29,10 @@ export default function Home() {
       if (response.ok) {
         const data = await response.json();
         setIsFirstUser(data.isFirstUser);
+        // Automatically switch to registration mode for first user
+        if (data.isFirstUser) {
+          setIsLogin(false);
+        }
       }
     } catch (error) {
       // Assume not first user if check fails
