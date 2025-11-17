@@ -22,6 +22,14 @@ export default function Dashboard() {
       return;
     }
 
+    // Decode JWT to get user role
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      setUserRole(payload.role || '');
+    } catch (error) {
+      console.error('Failed to decode token:', error);
+    }
+
     loadProducts();
   }, []);
 
@@ -83,6 +91,14 @@ export default function Dashboard() {
             >
               Create Product
             </button>
+            {userRole === 'admin' && (
+              <button
+                onClick={() => router.push('/admin/users')}
+                className="bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700"
+              >
+                Manage Users
+              </button>
+            )}
             <button
               onClick={handleLogout}
               className="bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700"

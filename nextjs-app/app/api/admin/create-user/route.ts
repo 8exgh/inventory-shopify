@@ -7,7 +7,8 @@ import { hashPassword, validatePassword } from '@/lib/auth/password';
 
 const CreateUserSchema = z.object({
   email: z.string().email(),
-  password: z.string().min(8)
+  password: z.string().min(8),
+  role: z.enum(['admin', 'restocker'])
 });
 
 export async function POST(request: NextRequest) {
@@ -31,7 +32,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { email, password } = validation.data;
+    const { email, password, role } = validation.data;
 
     // Check if user already exists
     const existingUser = getUserByEmail(email);
@@ -54,13 +55,13 @@ export async function POST(request: NextRequest) {
     // Hash password
     const password_hash = await hashPassword(password);
 
-    // Create restocker user (must change password on first login)
+    // Create user (must change password on first login)
     const userId = uuidv4();
     createUser({
       id: userId,
       email,
       password_hash,
-      role: 'restocker',
+      role,
       must_change_password: 1
     });
 
