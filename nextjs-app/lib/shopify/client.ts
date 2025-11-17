@@ -16,23 +16,6 @@ function getShopifyApiVersion(): string {
   return SHOPIFY_API_VERSION;
 }
 
-const shopify = shopifyApi({
-  apiKey: 'not-needed-for-custom-app',
-  apiSecretKey: 'not-needed-for-custom-app',
-  scopes: ['read_products', 'write_products', 'write_files'],
-  hostName: getShopifyShopDomain().replace('.myshopify.com', ''),
-  apiVersion: getShopifyApiVersion() as any,
-  isEmbeddedApp: false,
-});
-
-const session = {
-  shop: getShopifyShopDomain(),
-  accessToken: getShopifyAccessToken(),
-  state: 'active',
-  isOnline: false,
-  scope: 'read_products,write_products,write_files'
-};
-
 export interface ShopifyProduct {
   id: string;
   title: string;
