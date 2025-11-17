@@ -32,16 +32,9 @@ RUN npm ci --production
 # Copy compiled code from builder
 COPY --from=builder /app/dist ./dist
 
-# Create data directory (will be mounted as volume)
-RUN mkdir -p /data
-
 # Set environment variables with defaults
 ENV NODE_ENV=production
-ENV HOST=localhost
-ENV PORT=3000
-ENV DATA_DIR=/data
 ENV POLLING_INTERVAL_MS=5000
-# No exposed ports needed (background processor)
 
-# Start background processor
-CMD ["node", "dist/background/processor.js"]
+# Start background processor (change this line)
+CMD ["node", "dist/index.js"]
