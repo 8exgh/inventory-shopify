@@ -29,9 +29,7 @@ RUN npm ci --production
 # Copy Next.js build output from builder
 COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/next.config.* ./
-
-# Copy public directory if it exists (optional)
-COPY --from=builder /app/public ./public 2>/dev/null || true
+# COPY --from=builder /app/public ./public
 
 # Create data directory (will be mounted as volume)
 RUN mkdir -p /data
