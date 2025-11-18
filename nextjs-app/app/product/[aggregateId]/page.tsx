@@ -20,6 +20,7 @@ export default function ProductDetail() {
   const [weight, setWeight] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [imageUrl, setImageUrl] = useState<string>('');
   const router = useRouter();
   const params = useParams();
   const aggregateId = params.aggregateId as string;
@@ -31,6 +32,38 @@ export default function ProductDetail() {
       setAvailableColors(JSON.parse(storedColors));
     }
   }, [aggregateId]);
+
+  // Load product image
+  useEffect(() => {
+    loadProductImage();
+
+    // Cleanup object URL on unmount
+    return () => {
+      if (imageUrl) {
+        URL.revokeObjectURL(imageUrl);
+      }
+    };
+  }, [aggregateId]);
+
+  async function loadProductImage() {
+    try {
+      const token = localStorage.getItem('token');
+      const userId = localStorage.getItem('userId');
+
+      const response = await fetch(
+        `/api/queries/product-image?userId=${userId}&aggregateId=${aggregateId}`,
+        { headers: { 'Authorization': `Bearer ${token}` } }
+      );
+
+      if (response.ok) {
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        setImageUrl(url);
+      }
+    } catch (error) {
+      console.error('Failed to load product image:', error);
+    }
+  }
 
   useEffect(() => {
     loadProductState();
@@ -165,11 +198,17 @@ export default function ProductDetail() {
 
           <div className="space-y-6">
             <div>
-              <img
-                src={`/api/queries/product-image?userId=${localStorage.getItem('userId')}&aggregateId=${aggregateId}`}
-                alt="Product"
-                className="w-full max-w-md rounded-lg"
-              />
+              {imageUrl ? (
+                <img
+                  src={imageUrl}
+                  alt="Product"
+                  className="w-full max-w-md rounded-lg"
+                />
+              ) : (
+                <div className="w-full max-w-md h-64 bg-gray-200 rounded-lg flex items-center justify-center">
+                  <span className="text-gray-500">Loading image...</span>
+                </div>
+              )}
             </div>
 
             <div>
