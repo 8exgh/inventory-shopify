@@ -215,6 +215,23 @@ export default function ProductDetail() {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Color
               </label>
+
+              {/* Color preview rectangle */}
+              {productState.color && (
+                <div className="mb-3 flex items-center gap-3">
+                  <div
+                    className="w-20 h-20 rounded-md border-2 border-gray-300 shadow-sm"
+                    style={{
+                      backgroundColor: `rgb(${productState.color.r}, ${productState.color.g}, ${productState.color.b})`
+                    }}
+                  />
+                  <div className="text-xs text-gray-500">
+                    Estimated from photo<br />
+                    RGB({productState.color.r}, {productState.color.g}, {productState.color.b})
+                  </div>
+                </div>
+              )}
+
               {canEdit ? (
                 productState.color ? (
                   <select
