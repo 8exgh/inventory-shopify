@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { matchToAvailableColor } from '@/lib/utils/color-mapping';
+import { matchToAvailableColor, COLOR_REFERENCES, ColorName } from '@/lib/utils/color-mapping';
 
 interface ProductState {
   status: string;
@@ -21,6 +21,7 @@ export default function ProductDetail() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [imageUrl, setImageUrl] = useState<string>('');
+  const [estimatedRgb, setEstimatedRgb] = useState<{ r: number; g: number; b: number } | null>(null);
   const router = useRouter();
   const params = useParams();
   const aggregateId = params.aggregateId as string;
@@ -85,10 +86,12 @@ export default function ProductDetail() {
         const data = await response.json();
         setProductState(data);
 
-        // If color is estimated and not yet selected, match to available colors
-        if (data.color && !selectedColor && availableColors.length > 0) {
+        // If color just became available (transition from undefined to set)
+        if (data.color && !estimatedRgb && availableColors.length > 0) {
+          setEstimatedRgb(data.color);
           const matchedColor = matchToAvailableColor(data.color, availableColors);
-          setSelectedColor(matchedColor);
+          // Auto-match and send command with estimated RGB
+          handleColorChange(matchedColor, data.color);
         }
       }
     } catch (error) {
@@ -96,7 +99,7 @@ export default function ProductDetail() {
     }
   }
 
-  async function handleColorChange(newColor: string) {
+  async function handleColorChange(newColor: string, rgb?: { r: number; g: number; b: number }) {
     setSelectedColor(newColor);
 
     // Send color update command
@@ -104,8 +107,8 @@ export default function ProductDetail() {
       const token = localStorage.getItem('token');
       const userId = localStorage.getItem('userId');
 
-      // Convert color name to RGB (simplified - use COLOR_REFERENCES)
-      const colorRgb = { r: 0, g: 0, b: 255 }; // Placeholder
+      // Use provided RGB (from auto-match) or lookup from COLOR_REFERENCES (manual change)
+      const colorRgb = rgb || COLOR_REFERENCES[newColor as ColorName] || { r: 128, g: 128, b: 128 };
 
       await fetch('/api/commands/record-product-color', {
         method: 'POST',
