@@ -15,6 +15,7 @@ interface ProductState {
 
 export default function ProductDetail() {
   const [productState, setProductState] = useState<ProductState | null>(null);
+  const [availableColors, setAvailableColors] = useState<string[]>([]);
   const [weight, setWeight] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -22,6 +23,14 @@ export default function ProductDetail() {
   const router = useRouter();
   const params = useParams();
   const aggregateId = params.aggregateId as string;
+
+  // Load available colors from localStorage on mount
+  useEffect(() => {
+    const storedColors = localStorage.getItem(`colors-${aggregateId}`);
+    if (storedColors) {
+      setAvailableColors(JSON.parse(storedColors));
+    }
+  }, [aggregateId]);
 
   // Load product image
   useEffect(() => {
@@ -77,6 +86,34 @@ export default function ProductDetail() {
       }
     } catch (error) {
       console.error('Failed to load product state:', error);
+    }
+  }
+
+  async function handleColorChange(newColor: string) {
+    // Update color via SetColorV2 command
+    try {
+      const token = localStorage.getItem('token');
+      const userId = localStorage.getItem('userId');
+
+      await fetch('/api/commands/set-color-v2', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          userId,
+          aggregateId,
+          colorName: newColor
+        })
+      });
+
+      // Optimistically update UI
+      if (productState) {
+        setProductState({ ...productState, color: newColor });
+      }
+    } catch (error) {
+      console.error('Failed to update color:', error);
     }
   }
 
@@ -190,7 +227,19 @@ export default function ProductDetail() {
 
               {canEdit ? (
                 productState.estimatedColor && productState.color ? (
-                  <div className="text-gray-900 font-medium">{productState.color}</div>
+                  <select
+                    value={productState.color}
+                    onChange={(e) => handleColorChange(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                  >
+                    {availableColors.length > 0 ? (
+                      availableColors.map(color => (
+                        <option key={color} value={color}>{color}</option>
+                      ))
+                    ) : (
+                      <option value={productState.color}>{productState.color}</option>
+                    )}
+                  </select>
                 ) : (
                   <div className="text-gray-600">
                     {!productState.estimatedColor && 'Estimating color from photo...'}

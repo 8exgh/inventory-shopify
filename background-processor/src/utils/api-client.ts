@@ -138,8 +138,6 @@ export async function getProductDetailsForShopify(
     { headers: { 'X-API-Key': getApiKey() } }
   );
 
-  console.log('***productDetails response', response);
-
   if (!response.ok) {
     throw new Error(`Failed to get product details: ${response.statusText}`);
   }

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { requireApiKey } from '@/lib/auth/middleware';
+import { requireUserOrApiKey } from '@/lib/auth/middleware';
 import { handleSetColorV2 } from '@/lib/commands/product-commands';
 
 const SetColorV2Schema = z.object({
@@ -11,15 +11,6 @@ const SetColorV2Schema = z.object({
 
 export async function POST(request: NextRequest) {
   try {
-    // Require API key (only background processor can call this)
-    const auth = requireApiKey(request);
-    if (!auth.authenticated) {
-      return NextResponse.json(
-        { error: auth.error || 'Unauthorized' },
-        { status: 401 }
-      );
-    }
-
     const body = await request.json();
     const validation = SetColorV2Schema.safeParse(body);
 
@@ -31,6 +22,15 @@ export async function POST(request: NextRequest) {
     }
 
     const command = validation.data;
+
+    // Require user or API key authentication
+    const auth = requireUserOrApiKey(request, command.userId);
+    if (!auth.authenticated) {
+      return NextResponse.json(
+        { error: auth.error || 'Unauthorized' },
+        { status: 401 }
+      );
+    }
 
     // Handle command
     handleSetColorV2(command);
