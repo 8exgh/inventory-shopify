@@ -1,0 +1,39 @@
+### Get Product with All Variant Options
+GET https://{{shopifyShopDomain}}/admin/api/{{shopifyApiVersion}}/products/{{productId}}.json
+X-Shopify-Access-Token: {{shopifyAccessToken}}
+
+> {%
+    // Log the product options (Color, Weight, etc.)
+    client.log("=== Product Options ===");
+    response.body.product.options.forEach(function(option) {
+        client.log(option.name + " (position " + option.position + "): " + option.values.join(", "));
+    });
+
+    // Log all variants with their option combinations
+    client.log("\n=== Variants ===");
+    response.body.product.variants.forEach(function(variant) {
+        client.log("Variant ID: " + variant.id +
+            " | " + variant.option1 +
+            (variant.option2 ? " / " + variant.option2 : "") +
+            (variant.option3 ? " / " + variant.option3 : "") +
+            " | Price: $" + variant.price);
+    });
+%}
+
+###
+
+### Alternative: Get Only Variants (without full product details)
+GET https://{{shopifyShopDomain}}/admin/api/{{shopifyApiVersion}}/products/{{productId}}/variants.json
+X-Shopify-Access-Token: {{shopifyAccessToken}}
+
+> {%
+    client.log("=== All Variants ===");
+    response.body.variants.forEach(function(variant) {
+        client.log("ID: " + variant.id +
+            " | Options: " + variant.option1 +
+            (variant.option2 ? " / " + variant.option2 : "") +
+            (variant.option3 ? " / " + variant.option3 : ""));
+    });
+%}
+
+###

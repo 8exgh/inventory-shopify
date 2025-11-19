@@ -16,6 +16,7 @@ interface ProductState {
 export default function ProductDetail() {
   const [productState, setProductState] = useState<ProductState | null>(null);
   const [availableColors, setAvailableColors] = useState<string[]>([]);
+  const [availableWeights, setAvailableWeights] = useState<string[]>([]);
   const [weight, setWeight] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -70,6 +71,13 @@ export default function ProductDetail() {
     return () => clearInterval(interval);
   }, [aggregateId]);
 
+  // Load available weights when we have shopifyProductId
+  useEffect(() => {
+    if (productState?.shopifyProductId) {
+      loadProductWeights(productState.shopifyProductId);
+    }
+  }, [productState?.shopifyProductId]);
+
   async function loadProductState() {
     try {
       const token = localStorage.getItem('token');
@@ -86,6 +94,25 @@ export default function ProductDetail() {
       }
     } catch (error) {
       console.error('Failed to load product state:', error);
+    }
+  }
+
+  async function loadProductWeights(shopifyProductId: string) {
+    try {
+      const token = localStorage.getItem('token');
+      const userId = localStorage.getItem('userId');
+
+      const response = await fetch(
+        `/api/queries/product-weights?userId=${userId}&shopifyProductId=${shopifyProductId}`,
+        { headers: { 'Authorization': `Bearer ${token}` } }
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        setAvailableWeights(data.weights);
+      }
+    } catch (error) {
+      console.error('Failed to load product weights:', error);
     }
   }
 
@@ -256,13 +283,21 @@ export default function ProductDetail() {
                 Weight
               </label>
               {canEdit ? (
-                <input
-                  type="text"
-                  value={weight}
-                  onChange={(e) => setWeight(e.target.value)}
-                  placeholder="e.g., 168G RED PRISM Foil"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
-                />
+                <>
+                  <input
+                    type="text"
+                    value={weight}
+                    onChange={(e) => setWeight(e.target.value)}
+                    placeholder="e.g., 168G RED PRISM Foil"
+                    list="weight-options"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                  />
+                  <datalist id="weight-options">
+                    {availableWeights.map(w => (
+                      <option key={w} value={w} />
+                    ))}
+                  </datalist>
+                </>
               ) : (
                 <div className="text-gray-900">{productState.weight || 'Not set'}</div>
               )}
