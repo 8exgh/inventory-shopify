@@ -263,19 +263,15 @@ export async function runShopifyCreationJob(): Promise<void> {
                 const imageBuffer = await getProductImage(task.userId, task.aggregateId);
                 const imageBase64 = imageBuffer.toString('base64');
 
-                // Get existing variants to determine available colors and weights
+                // Get existing variants to determine available weights
                 const existingVariants = await getExistingVariants(details.shopifyProductId);
 
-                // Extract available colors for this product
-                const availableColors = getAvailableColors(existingVariants);
-                console.log(`[Shopify Creation] Available colors for product: ${availableColors.join(', ')}`);
-
-                // Match estimated RGB to closest available color
-                const colorName = matchToAvailableColor(details.color, availableColors);
-                console.log(`[Shopify Creation] Matched RGB(${details.color.r},${details.color.g},${details.color.b}) to: ${colorName}`);
+                // Use the color that was already matched in color-estimation job
+                const colorName = details.color;
+                console.log(`[Shopify Creation] Using color: ${colorName}`);
 
                 // Make weight unique
-                const uniqueWeight = makeWeightUnique(details.weight, existingVariants);
+                const uniqueWeight = makeWeightUnique(details.weight!, existingVariants);
                 console.log(`[Shopify Creation] Unique weight: ${uniqueWeight}`);
 
                 // Upload image
@@ -285,7 +281,7 @@ export async function runShopifyCreationJob(): Promise<void> {
                 // Create variant (now includes setting inventory to 1)
                 const variantId = await createVariant(
                     details.shopifyProductId,
-                    colorName,
+                    colorName!,
                     uniqueWeight,
                     imageId
                 );

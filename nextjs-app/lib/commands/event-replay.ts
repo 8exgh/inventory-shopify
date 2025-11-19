@@ -18,7 +18,11 @@ export function replayEvents(events: Event[]): ProductState {
         break;
 
       case 'ColorEstimated':
-        state = { ...state, color: eventData.color };
+        state = { ...state, estimatedColor: eventData.color };
+        break;
+
+      case 'ColorSetV2':
+        state = { ...state, color: eventData.colorName };
         break;
 
       case 'ProductWeightSet':

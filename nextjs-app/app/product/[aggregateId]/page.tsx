@@ -2,37 +2,26 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { matchToAvailableColor, COLOR_REFERENCES, ColorName } from '@/lib/utils/color-mapping';
 
 interface ProductState {
   status: string;
   shopifyProductId: string;
   shopifyProductTitle: string;
-  color?: { r: number; g: number; b: number };
+  estimatedColor?: { r: number; g: number; b: number };
+  color?: string;
   weight?: string;
   errorMessage?: string;
 }
 
 export default function ProductDetail() {
   const [productState, setProductState] = useState<ProductState | null>(null);
-  const [selectedColor, setSelectedColor] = useState('');
-  const [availableColors, setAvailableColors] = useState<string[]>([]);
   const [weight, setWeight] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [imageUrl, setImageUrl] = useState<string>('');
-  const [estimatedRgb, setEstimatedRgb] = useState<{ r: number; g: number; b: number } | null>(null);
   const router = useRouter();
   const params = useParams();
   const aggregateId = params.aggregateId as string;
-
-  // Load available colors from localStorage on mount
-  useEffect(() => {
-    const storedColors = localStorage.getItem(`colors-${aggregateId}`);
-    if (storedColors) {
-      setAvailableColors(JSON.parse(storedColors));
-    }
-  }, [aggregateId]);
 
   // Load product image
   useEffect(() => {
@@ -85,45 +74,9 @@ export default function ProductDetail() {
       if (response.ok) {
         const data = await response.json();
         setProductState(data);
-
-        // If color just became available (transition from undefined to set)
-        if (data.color && !estimatedRgb && availableColors.length > 0) {
-          setEstimatedRgb(data.color);
-          const matchedColor = matchToAvailableColor(data.color, availableColors);
-          // Auto-match and send command with estimated RGB
-          handleColorChange(matchedColor, data.color);
-        }
       }
     } catch (error) {
       console.error('Failed to load product state:', error);
-    }
-  }
-
-  async function handleColorChange(newColor: string, rgb?: { r: number; g: number; b: number }) {
-    setSelectedColor(newColor);
-
-    // Send color update command
-    try {
-      const token = localStorage.getItem('token');
-      const userId = localStorage.getItem('userId');
-
-      // Use provided RGB (from auto-match) or lookup from COLOR_REFERENCES (manual change)
-      const colorRgb = rgb || COLOR_REFERENCES[newColor as ColorName] || { r: 128, g: 128, b: 128 };
-
-      await fetch('/api/commands/record-product-color', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          userId,
-          aggregateId,
-          color: colorRgb
-        })
-      });
-    } catch (error) {
-      console.error('Failed to update color:', error);
     }
   }
 
@@ -220,41 +173,32 @@ export default function ProductDetail() {
               </label>
 
               {/* Color preview rectangle */}
-              {productState.color && (
+              {productState.estimatedColor && (
                 <div className="mb-3 flex items-center gap-3">
                   <div
                     className="w-20 h-20 rounded-md border-2 border-gray-300 shadow-sm"
                     style={{
-                      backgroundColor: `rgb(${productState.color.r}, ${productState.color.g}, ${productState.color.b})`
+                      backgroundColor: `rgb(${productState.estimatedColor.r}, ${productState.estimatedColor.g}, ${productState.estimatedColor.b})`
                     }}
                   />
                   <div className="text-xs text-gray-500">
                     Estimated from photo<br />
-                    RGB({productState.color.r}, {productState.color.g}, {productState.color.b})
+                    RGB({productState.estimatedColor.r}, {productState.estimatedColor.g}, {productState.estimatedColor.b})
                   </div>
                 </div>
               )}
 
               {canEdit ? (
-                productState.color ? (
-                  <select
-                    value={selectedColor}
-                    onChange={(e) => handleColorChange(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
-                  >
-                    {availableColors.length > 0 ? (
-                      availableColors.map(color => (
-                        <option key={color} value={color}>{color}</option>
-                      ))
-                    ) : (
-                      <option value="">Loading colors...</option>
-                    )}
-                  </select>
+                productState.estimatedColor && productState.color ? (
+                  <div className="text-gray-900 font-medium">{productState.color}</div>
                 ) : (
-                  <div className="text-gray-600">Estimating color...</div>
+                  <div className="text-gray-600">
+                    {!productState.estimatedColor && 'Estimating color from photo...'}
+                    {productState.estimatedColor && !productState.color && 'Matching to available colors...'}
+                  </div>
                 )
               ) : (
-                <div className="text-gray-900">{selectedColor || 'Not set'}</div>
+                <div className="text-gray-900">{productState.color || 'Not set'}</div>
               )}
             </div>
 
@@ -302,7 +246,7 @@ export default function ProductDetail() {
             {canEdit && (
               <button
                 onClick={handleFinish}
-                disabled={loading || !weight || !productState.color}
+                disabled={loading || !weight || !productState.estimatedColor || !productState.color}
                 className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:bg-gray-400"
               >
                 {loading ? 'Creating...' : 'Create in Shopify'}

@@ -4,6 +4,8 @@ import { getProductDetailsForShopify } from '@/lib/queries/product-queries';
 
 export async function GET(request: NextRequest) {
   try {
+      console.log('***product-details-for-shopify', request);
+
     // Require API key (only background processor can call this)
     const auth = requireApiKey(request);
     if (!auth.authenticated) {
@@ -27,6 +29,8 @@ export async function GET(request: NextRequest) {
 
     // Get product details
     const details = getProductDetailsForShopify(userId, aggregateId);
+
+    console.log('***product-details-for-shopify details', details);
 
     if (!details) {
       return NextResponse.json(

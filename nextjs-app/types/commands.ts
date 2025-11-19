@@ -13,6 +13,18 @@ export interface RecordProductColorCommand {
   color: { r: number; g: number; b: number };
 }
 
+export interface SetEstimatedColorCommand {
+  userId: string;
+  aggregateId: string;
+  color: { r: number; g: number; b: number };
+}
+
+export interface SetColorV2Command {
+  userId: string;
+  aggregateId: string;
+  colorName: string;
+}
+
 export interface FinishCreateProductCommand {
   userId: string;
   aggregateId: string;

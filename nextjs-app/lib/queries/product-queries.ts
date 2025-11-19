@@ -19,6 +19,7 @@ export function getProductState(userId: string, aggregateId: string): ProductSta
     status: state.status as 'data-entry' | 'creating' | 'created' | 'failed',
     shopifyProductId: state.shopifyProductId!,
     shopifyProductTitle: state.shopifyProductTitle!,
+    estimatedColor: state.estimatedColor,
     color: state.color,
     weight: state.weight,
     errorMessage: state.errorMessage
@@ -124,15 +125,16 @@ export function getProductDetailsForShopify(userId: string, aggregateId: string)
 
   const state = replayEvents(events);
 
-  if (!state.shopifyProductId || !state.shopifyProductTitle || !state.color || !state.weight) {
+  if (!state.shopifyProductId || !state.shopifyProductTitle) {
     return null;
   }
 
   return {
     shopifyProductId: state.shopifyProductId,
     shopifyProductTitle: state.shopifyProductTitle,
-    color: state.color,
-    weight: state.weight
+    estimatedColor: !state.estimatedColor ? null : state.estimatedColor,
+    color: !state.color ? null : state.color,
+    weight: !state.weight ? null : state.weight
   };
 }
 

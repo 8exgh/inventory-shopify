@@ -15,10 +15,8 @@ export interface AuthResult {
 }
 
 export function authenticateRequest(request: NextRequest): AuthResult {
-  console.log('***4');
   // Check for API Key first
   const apiKey = request.headers.get('X-API-Key');
-  console.log(`***x-api-key ${apiKey}`)
   if (apiKey && apiKey === getBackgroundProcessorApiKey()) {
     return { authenticated: true, isApiKey: true };
   }

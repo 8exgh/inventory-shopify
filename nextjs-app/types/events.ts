@@ -1,6 +1,7 @@
 export type EventType =
   | 'BeginProductCreated'
   | 'ColorEstimated'
+  | 'ColorSetV2'
   | 'ProductWeightSet'
   | 'ProductReadyToBeCreated'
   | 'ProductCreated'
@@ -14,6 +15,10 @@ export interface BeginProductCreatedData {
 
 export interface ColorEstimatedData {
   color: { r: number; g: number; b: number };
+}
+
+export interface ColorSetV2Data {
+  colorName: string;
 }
 
 export interface ProductWeightSetData {
@@ -35,6 +40,7 @@ export interface ProductCreateFailedData {
 export type EventData =
   | BeginProductCreatedData
   | ColorEstimatedData
+  | ColorSetV2Data
   | ProductWeightSetData
   | ProductReadyToBeCreatedData
   | ProductCreatedData
@@ -56,7 +62,8 @@ export interface ProductState {
   shopifyProductId?: string;
   shopifyProductTitle?: string;
   photoMimeType?: string;
-  color?: { r: number; g: number; b: number };
+  estimatedColor?: { r: number; g: number; b: number };
+  color?: string;
   weight?: string;
   shopifyVariantId?: string;
   errorMessage?: string;

@@ -18,8 +18,18 @@ export interface ProductTask {
 export interface ProductDetails {
   shopifyProductId: string;
   shopifyProductTitle: string;
-  color: { r: number; g: number; b: number };
-  weight: string;
+  estimatedColor: { r: number; g: number; b: number } | null;
+  color: string | null;
+  weight: string | null;
+}
+
+export interface ShopifyProduct {
+  id: string;
+  title: string;
+  variants: Array<{
+    id: string;
+    option1: string | null;
+  }>;
 }
 
 export async function getProductsNeedingColorEstimation(): Promise<ProductTask[]> {
@@ -27,14 +37,9 @@ export async function getProductsNeedingColorEstimation(): Promise<ProductTask[]
     headers: { 'X-API-Key':  getApiKey() },
   });
 
-  console.log('***1');
-
   if (!response.ok) {
-    console.log('***2');
     throw new Error(`Failed to get products: ${response.statusText}`);
   }
-
-  console.log('***3');
 
   const data = await response.json() as any;
   return data.tasks;
@@ -73,6 +78,44 @@ export async function recordProductColor(
   }
 }
 
+export async function setEstimatedColor(
+  userId: string,
+  aggregateId: string,
+  color: { r: number; g: number; b: number }
+): Promise<void> {
+  const response = await fetch(`${getApiUrl()}/api/commands/set-estimated-color`, {
+    method: 'POST',
+    headers: {
+      'X-API-Key': getApiKey(),
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ userId, aggregateId, color })
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to set estimated color: ${response.statusText}`);
+  }
+}
+
+export async function setColorV2(
+  userId: string,
+  aggregateId: string,
+  colorName: string
+): Promise<void> {
+  const response = await fetch(`${getApiUrl()}/api/commands/set-color-v2`, {
+    method: 'POST',
+    headers: {
+      'X-API-Key': getApiKey(),
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ userId, aggregateId, colorName })
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to set color v2: ${response.statusText}`);
+  }
+}
+
 export async function getProductsToCreateInShopify(): Promise<ProductTask[]> {
   const response = await fetch(`${getApiUrl()}/api/queries/products-to-create-in-shopify`, {
     headers: { 'X-API-Key': getApiKey() },
@@ -94,6 +137,8 @@ export async function getProductDetailsForShopify(
     `${getApiUrl()}/api/queries/product-details-for-shopify?userId=${userId}&aggregateId=${aggregateId}`,
     { headers: { 'X-API-Key': getApiKey() } }
   );
+
+  console.log('***productDetails response', response);
 
   if (!response.ok) {
     throw new Error(`Failed to get product details: ${response.statusText}`);

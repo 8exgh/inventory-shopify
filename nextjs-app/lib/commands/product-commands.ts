@@ -3,6 +3,8 @@ import { replayEvents } from './event-replay';
 import {
   BeginCreateProductCommand,
   RecordProductColorCommand,
+  SetEstimatedColorCommand,
+  SetColorV2Command,
   FinishCreateProductCommand,
   RecordProductCreatedInShopifyCommand,
   RecordProductFailedInShopifyCommand
@@ -39,6 +41,11 @@ export function handleBeginCreateProduct(command: BeginCreateProductCommand): vo
 }
 
 export function handleRecordProductColor(command: RecordProductColorCommand): void {
+  // DEPRECATED: This command is deprecated, use SetColorV2 instead
+  throw new Error('This command is deprecated. Use SetColorV2 instead.');
+}
+
+export function handleSetEstimatedColor(command: SetEstimatedColorCommand): void {
   const { userId, aggregateId, color } = command;
 
   // Load existing events
@@ -55,6 +62,28 @@ export function handleRecordProductColor(command: RecordProductColorCommand): vo
     aggregateId,
     eventType: 'ColorEstimated',
     eventData: JSON.stringify({ color }),
+    timestamp: Date.now(),
+    version: events.length + 1
+  });
+}
+
+export function handleSetColorV2(command: SetColorV2Command): void {
+  const { userId, aggregateId, colorName } = command;
+
+  // Load existing events
+  const events = loadEvents(userId, aggregateId);
+  const state = replayEvents(events);
+
+  // Validate: Must have started product creation
+  if (state.status === 'not-started') {
+    throw new Error('Product creation not started');
+  }
+
+  // Insert ColorSetV2 event (no validations as requested)
+  insertEvent(userId, {
+    aggregateId,
+    eventType: 'ColorSetV2',
+    eventData: JSON.stringify({ colorName }),
     timestamp: Date.now(),
     version: events.length + 1
   });
