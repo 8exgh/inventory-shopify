@@ -28,22 +28,23 @@ RUN npm ci --production
 
 # Copy Next.js build output from builder
 COPY --from=builder /app/.next ./.next
-COPY --from=builder /app/next.config.mjs ./
+COPY --from=builder /app/next.config.* ./
+# COPY --from=builder /app/public ./public
 
-# Copy font files (referenced in layout)
-COPY --from=builder /app/src/app/fonts ./src/app/fonts
+# Create data directory (will be mounted as volume)
+RUN mkdir -p /data
 
 # Set environment variables with defaults
 ENV NODE_ENV=production
 ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
 
-# Expose frontend port
+# Expose backend port
 EXPOSE 3000
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:3000 || exit 1
+  CMD node -e "require('http').get('http://localhost:3000/api/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
 
 # Start Next.js server
 CMD ["npm", "start"]
