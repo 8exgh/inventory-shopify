@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { Header } from '@/components/Header';
 
 export default function ChangePassword() {
   const [oldPassword, setOldPassword] = useState('');
@@ -64,8 +65,10 @@ export default function ChangePassword() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4">
-      <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-8">
+    <div className="min-h-screen bg-gray-50">
+      <Header />
+      <div className="flex items-center justify-center p-4" style={{ minHeight: 'calc(100vh - 57px)' }}>
+        <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-8">
         <h1 className="text-3xl font-bold text-center mb-2 text-gray-800">
           Change Password
         </h1>
@@ -133,6 +136,7 @@ export default function ChangePassword() {
             {loading ? 'Changing Password...' : 'Change Password'}
           </button>
         </form>
+        </div>
       </div>
     </div>
   );

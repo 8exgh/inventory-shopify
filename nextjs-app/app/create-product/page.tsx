@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { v4 as uuidv4 } from 'uuid';
+import { Header } from '@/components/Header';
 
 interface ShopifyProduct {
   id: string;
@@ -110,8 +111,9 @@ export default function CreateProduct() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4">
-      <div className="max-w-2xl mx-auto">
+    <div className="min-h-screen bg-gray-50">
+      <Header />
+      <div className="max-w-2xl mx-auto p-4">
         <div className="mb-4">
           <button
             onClick={() => router.push('/dashboard')}
