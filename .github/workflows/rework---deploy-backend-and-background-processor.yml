@@ -31,25 +31,13 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract metadata (Backend)
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.BACKEND_IMAGE }}
-          tags: |
-            type=ref,event=branch
-            type=ref,event=pr
-            type=sha,prefix={{branch}}-
-            type=raw,value=latest,enable={{is_default_branch}}
-
       - name: Build and push Backend Docker image
         uses: docker/build-push-action@v5
         with:
           context: ./nextjs-app
           file: ./nextjs-app/Dockerfile
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          tags: ${{ env.REGISTRY }}/${{ env.BACKEND_IMAGE }}:rework
           cache-from: type=gha,scope=backend
           cache-to: type=gha,mode=max,scope=backend
 
@@ -73,25 +61,13 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract metadata (Processor)
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.PROCESSOR_IMAGE }}
-          tags: |
-            type=ref,event=branch
-            type=ref,event=pr
-            type=sha,prefix={{branch}}-
-            type=raw,value=latest,enable={{is_default_branch}}
-
       - name: Build and push Processor Docker image
         uses: docker/build-push-action@v5
         with:
           context: ./background-processor
           file: ./background-processor/Dockerfile
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          tags: ${{ env.REGISTRY }}/${{ env.PROCESSOR_IMAGE }}:rework
           cache-from: type=gha,scope=processor
           cache-to: type=gha,mode=max,scope=processor
 
@@ -110,7 +86,7 @@ jobs:
             -d '{
               "event_type": "inventory-shopify-deploy---rework",
               "client_payload": {
-                "backend_image": "${{ env.REGISTRY }}/${{ env.BACKEND_IMAGE }}:latest",
-                "processor_image": "${{ env.REGISTRY }}/${{ env.PROCESSOR_IMAGE }}:latest"
+                "backend_image": "${{ env.REGISTRY }}/${{ env.BACKEND_IMAGE }}:rework",
+                "processor_image": "${{ env.REGISTRY }}/${{ env.PROCESSOR_IMAGE }}:rework"
               }
             }'
