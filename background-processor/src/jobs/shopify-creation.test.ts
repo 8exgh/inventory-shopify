@@ -2,9 +2,8 @@ import { describe, it, expect, jest, beforeEach } from '@jest/globals';
 import { createVariant } from './shopify-creation.js';
 
 // Mock environment variables
-process.env.SHOPIFY_SHOP_DOMAIN = 'vbxsb1-cr.myshopify.com';
-process.env.SHOPIFY_ACCESS_TOKEN = 'TODO';
 process.env.SHOPIFY_API_VERSION = '2025-10';
+process.env.SHOPIFY_LOCATION_ID = '12345678';
 
 
 describe('createVariant', () => {
@@ -18,12 +17,14 @@ describe('createVariant', () => {
     const colorName = 'Blue';
     const weight = '168G';
     const imageId = '98765';
+    const accessToken = 'shpca_test_token';
+    const shop = 'test-store.myshopify.com';
 
     // Act
-    const result = await createVariant(productId, colorName, weight, imageId);
+    const result = await createVariant(productId, colorName, weight, imageId, accessToken, shop);
 
     // Assert
-    expect(global.fetch).toHaveBeenCalledTimes(1);
+    expect(global.fetch).toHaveBeenCalledTimes(2); // Once for variant creation, once for inventory
     expect(global.fetch).toHaveBeenCalledWith(
       'https://test-store.myshopify.com/admin/api/2025-10/products/12345/variants.json',
       expect.objectContaining({
@@ -36,7 +37,6 @@ describe('createVariant', () => {
           variant: {
             option1: 'Blue',
             option2: '168G',
-            inventory_quantity: 1,
             inventory_management: 'shopify',
             inventory_policy: 'deny',
             image_id: '98765'

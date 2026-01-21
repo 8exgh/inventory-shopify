@@ -193,3 +193,23 @@ export async function recordProductFailed(
     throw new Error(`Failed to record product failed: ${response.statusText}`);
   }
 }
+
+export interface ShopifyTokenResult {
+  accessToken: string;
+  expiresAt: number;
+  shop: string;
+}
+
+export async function getShopifyToken(userId: string): Promise<ShopifyTokenResult | null> {
+  const response = await fetch(
+    `${getApiUrl()}/api/queries/latest-shopify-token?userId=${userId}`,
+    { headers: { 'X-API-Key': getApiKey() } }
+  );
+
+  if (!response.ok) {
+    throw new Error(`Failed to get Shopify token: ${response.statusText}`);
+  }
+
+  const data = await response.json() as { token: ShopifyTokenResult | null };
+  return data.token;
+}

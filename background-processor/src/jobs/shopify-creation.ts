@@ -3,18 +3,9 @@ import {
     getProductImage,
     getProductDetailsForShopify,
     recordProductCreated,
-    recordProductFailed
+    recordProductFailed,
+    getShopifyToken
 } from '../utils/api-client.js';
-
-function getShopifyShopDomain(): string {
-    const SHOPIFY_SHOP_DOMAIN = process.env.SHOPIFY_SHOP_DOMAIN || '';
-    return SHOPIFY_SHOP_DOMAIN;
-}
-
-function getShopifyAccessToken(): string {
-    const SHOPIFY_ACCESS_TOKEN = process.env.SHOPIFY_ACCESS_TOKEN || '';
-    return SHOPIFY_ACCESS_TOKEN;
-}
 
 function getShopifyApiVersion(): string {
     const SHOPIFY_API_VERSION = process.env.SHOPIFY_API_VERSION || '2025-10';
@@ -108,12 +99,16 @@ function matchToAvailableColor(
     return closestColor;
 }
 
-async function getExistingVariants(productId: string): Promise<any[]> {
+async function getExistingVariants(
+    productId: string,
+    accessToken: string,
+    shop: string
+): Promise<any[]> {
     const response = await fetch(
-        `https://${getShopifyShopDomain()}/admin/api/${getShopifyApiVersion()}/products/${productId}/variants.json`,
+        `https://${shop}/admin/api/${getShopifyApiVersion()}/products/${productId}/variants.json`,
         {
             headers: {
-                'X-Shopify-Access-Token': getShopifyAccessToken()
+                'X-Shopify-Access-Token': accessToken
             }
         }
     );
@@ -126,13 +121,18 @@ async function getExistingVariants(productId: string): Promise<any[]> {
     return data.variants || [];
 }
 
-async function uploadImage(productId: string, imageBase64: string): Promise<string> {
+async function uploadImage(
+    productId: string,
+    imageBase64: string,
+    accessToken: string,
+    shop: string
+): Promise<string> {
     const response = await fetch(
-        `https://${getShopifyShopDomain()}/admin/api/${getShopifyApiVersion()}/products/${productId}/images.json`,
+        `https://${shop}/admin/api/${getShopifyApiVersion()}/products/${productId}/images.json`,
         {
             method: 'POST',
             headers: {
-                'X-Shopify-Access-Token': getShopifyAccessToken(),
+                'X-Shopify-Access-Token': accessToken,
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
@@ -152,7 +152,12 @@ async function uploadImage(productId: string, imageBase64: string): Promise<stri
     return data.image.id.toString();
 }
 
-async function setInventoryLevel(inventoryItemId: string, quantity: number): Promise<void> {
+async function setInventoryLevel(
+    inventoryItemId: string,
+    quantity: number,
+    accessToken: string,
+    shop: string
+): Promise<void> {
     const locationId = getShopifyLocationId();
 
     if (!locationId) {
@@ -160,11 +165,11 @@ async function setInventoryLevel(inventoryItemId: string, quantity: number): Pro
     }
 
     const response = await fetch(
-        `https://${getShopifyShopDomain()}/admin/api/${getShopifyApiVersion()}/inventory_levels/set.json`,
+        `https://${shop}/admin/api/${getShopifyApiVersion()}/inventory_levels/set.json`,
         {
             method: 'POST',
             headers: {
-                'X-Shopify-Access-Token': getShopifyAccessToken(),
+                'X-Shopify-Access-Token': accessToken,
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
@@ -185,15 +190,17 @@ export async function createVariant(
     productId: string,
     colorName: string,
     weight: string,
-    imageId: string
+    imageId: string,
+    accessToken: string,
+    shop: string
 ): Promise<string> {
     // Step 1: Create variant (inventory_quantity is ignored when inventory_management='shopify')
     const response = await fetch(
-        `https://${getShopifyShopDomain()}/admin/api/${getShopifyApiVersion()}/products/${productId}/variants.json`,
+        `https://${shop}/admin/api/${getShopifyApiVersion()}/products/${productId}/variants.json`,
         {
             method: 'POST',
             headers: {
-                'X-Shopify-Access-Token': getShopifyAccessToken(),
+                'X-Shopify-Access-Token': accessToken,
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
@@ -218,7 +225,7 @@ export async function createVariant(
     const inventoryItemId = data.variant.inventory_item_id.toString();
 
     // Step 2: Set inventory quantity to 1
-    await setInventoryLevel(inventoryItemId, 1);
+    await setInventoryLevel(inventoryItemId, 1, accessToken, shop);
 
     return variantId;
 }
@@ -255,6 +262,15 @@ export async function runShopifyCreationJob(): Promise<void> {
             try {
                 console.log(`[Shopify Creation] Processing ${task.aggregateId}...`);
 
+                // Get user's Shopify token
+                const tokenResult = await getShopifyToken(task.userId);
+                if (!tokenResult) {
+                    console.warn(`[Shopify Creation] No valid Shopify token for user ${task.userId}, skipping ${task.aggregateId}`);
+                    continue;
+                }
+
+                const { accessToken, shop } = tokenResult;
+
                 // Get product details
                 const details = await getProductDetailsForShopify(task.userId, task.aggregateId);
                 console.log(`[Shopify Creation] Details:`, details);
@@ -264,7 +280,7 @@ export async function runShopifyCreationJob(): Promise<void> {
                 const imageBase64 = imageBuffer.toString('base64');
 
                 // Get existing variants to determine available weights
-                const existingVariants = await getExistingVariants(details.shopifyProductId);
+                const existingVariants = await getExistingVariants(details.shopifyProductId, accessToken, shop);
 
                 // Use the color that was already matched in color-estimation job
                 const colorName = details.color;
@@ -275,7 +291,7 @@ export async function runShopifyCreationJob(): Promise<void> {
                 console.log(`[Shopify Creation] Unique weight: ${uniqueWeight}`);
 
                 // Upload image
-                const imageId = await uploadImage(details.shopifyProductId, imageBase64);
+                const imageId = await uploadImage(details.shopifyProductId, imageBase64, accessToken, shop);
                 console.log(`[Shopify Creation] Uploaded image: ${imageId}`);
 
                 // Create variant (now includes setting inventory to 1)
@@ -283,7 +299,9 @@ export async function runShopifyCreationJob(): Promise<void> {
                     details.shopifyProductId,
                     colorName!,
                     uniqueWeight,
-                    imageId
+                    imageId,
+                    accessToken,
+                    shop
                 );
                 console.log(`[Shopify Creation] Created variant: ${variantId}`);
 
