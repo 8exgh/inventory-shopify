@@ -1,0 +1,16 @@
+- branch
+  - feature/2026_03_22_migrate_legacy_shopify_integration
+- Todo
+    - [ ] Migrate from legacy shopify app integration to the supported shopify app integration
+    - [ ] Add draft/active toggle button to product UI
+    - [ ] Create command to set product status (draft/active) in the API
+    - [ ] Add background processor job to sync draft/active status to Shopify
+    - [ ] Write event back to API on successful Shopify status change
+    - [ ] Update UI to reflect product draft/active state
+    - [ ] Replace colour dropdown with colour swatches
+    - [ ] Reduce/curate colour options available
+    - [ ] Auto centre product image
+    - [ ] Auto size product image
+    - [ ] Add quantity radio buttons
+    - [ ] New products start in draft by default
+    - [ ] Support restocking workflow: set to draft → restock → set to active
