@@ -2,7 +2,7 @@ name: Build and Deploy Inventory Shopify
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, feature/2026_03_22_migrate_legacy_shopify_integration ]
   workflow_dispatch:
 
 env:
