@@ -1,41 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { requireUserOrApiKey } from '@/lib/auth/middleware';
+import { shopifyClient } from '@/lib/shopify/client';
 
 const ProductWeightsSchema = z.object({
   userId: z.string().uuid(),
   shopifyProductId: z.string()
 });
 
-function getShopifyShopDomain(): string {
-  return process.env.SHOPIFY_SHOP_DOMAIN || '';
-}
-
-function getShopifyAccessToken(): string {
-  return process.env.SHOPIFY_ACCESS_TOKEN || '';
-}
-
-function getShopifyApiVersion(): string {
-  return process.env.SHOPIFY_API_VERSION || '2025-10';
-}
-
 async function getProductWeights(shopifyProductId: string): Promise<string[]> {
-  const baseUrl = `https://${getShopifyShopDomain()}/admin/api/${getShopifyApiVersion()}`;
-  const response = await fetch(`${baseUrl}/products/${shopifyProductId}/variants.json`, {
-    headers: {
-      'X-Shopify-Access-Token': getShopifyAccessToken(),
-      'Content-Type': 'application/json'
-    }
-  });
-
-  if (!response.ok) {
-    throw new Error(`Failed to fetch variants: ${response.statusText}`);
-  }
-
-  const data = await response.json() as any;
+  const variants = await shopifyClient.getVariants(shopifyProductId);
   const weights = new Set<string>();
 
-  for (const variant of data.variants) {
+  for (const variant of variants) {
     if (variant.option2) {
       weights.add(variant.option2);
     }

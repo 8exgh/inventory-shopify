@@ -1,21 +1,6 @@
 import { getProductsNeedingColorEstimation, getProductImage, setEstimatedColor, setColorV2, getProductDetailsForShopify } from '../utils/api-client.js';
 import { estimateColor } from '../utils/color-estimation.js';
-import fetch from 'node-fetch';
-
-function getShopifyShopDomain(): string {
-  const SHOPIFY_SHOP_DOMAIN = process.env.SHOPIFY_SHOP_DOMAIN || '';
-  return SHOPIFY_SHOP_DOMAIN;
-}
-
-function getShopifyAccessToken(): string {
-  const SHOPIFY_ACCESS_TOKEN = process.env.SHOPIFY_ACCESS_TOKEN || '';
-  return SHOPIFY_ACCESS_TOKEN;
-}
-
-function getShopifyApiVersion(): string {
-  const SHOPIFY_API_VERSION = process.env.SHOPIFY_API_VERSION || '2025-10';
-  return SHOPIFY_API_VERSION;
-}
+import { graphql, toGid } from '../utils/shopify.js';
 
 const COLOR_RGB_REFERENCES: Record<string, { r: number; g: number; b: number }> = {
   'Red': { r: 255, g: 0, b: 0 },
@@ -32,24 +17,32 @@ const COLOR_RGB_REFERENCES: Record<string, { r: number; g: number; b: number }> 
 };
 
 async function getProductColors(shopifyProductId: string): Promise<string[]> {
-  const baseUrl = `https://${getShopifyShopDomain()}/admin/api/${getShopifyApiVersion()}`;
-  const response = await fetch(`${baseUrl}/products/${shopifyProductId}/variants.json`, {
-    headers: {
-      'X-Shopify-Access-Token': getShopifyAccessToken(),
-      'Content-Type': 'application/json'
+  const data = await graphql<{
+    product: {
+      variants: {
+        nodes: Array<{
+          selectedOptions: Array<{ name: string; value: string }>;
+        }>
+      }
     }
-  });
+  }>(`
+    query($id: ID!) {
+      product(id: $id) {
+        variants(first: 250) {
+          nodes {
+            selectedOptions { name value }
+          }
+        }
+      }
+    }
+  `, { id: toGid('Product', shopifyProductId) });
 
-  if (!response.ok) {
-    throw new Error(`Failed to fetch product variants: ${response.statusText}`);
-  }
-
-  const data = await response.json() as any;
   const colors = new Set<string>();
-
-  for (const variant of data.variants) {
-    if (variant.option1) {
-      colors.add(variant.option1);
+  for (const variant of data.product.variants.nodes) {
+    const colorOption = variant.selectedOptions.find(o => o.name === 'Color')
+                     ?? variant.selectedOptions[0];
+    if (colorOption?.value) {
+      colors.add(colorOption.value);
     }
   }
 
