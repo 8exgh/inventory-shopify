@@ -2,7 +2,7 @@ name: Build and Deploy Inventory Shopify
 
 on:
   push:
-    branches: [ main, feature/2026_03_22_migrate_legacy_shopify_integration ]
+    branches: [ feature/2026_03_22_migrate_legacy_shopify_integration ]
   workflow_dispatch:
 
 env:
@@ -40,7 +40,7 @@ jobs:
             type=ref,event=branch
             type=ref,event=pr
             type=sha,prefix={{branch}}-
-            type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=feature,enable={{is_default_branch}}
 
       - name: Build and push Backend Docker image
         uses: docker/build-push-action@v5
@@ -82,7 +82,7 @@ jobs:
             type=ref,event=branch
             type=ref,event=pr
             type=sha,prefix={{branch}}-
-            type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=feature,enable={{is_default_branch}}
 
       - name: Build and push Processor Docker image
         uses: docker/build-push-action@v5
@@ -110,7 +110,7 @@ jobs:
             -d '{
               "event_type": "inventory-shopify-deploy",
               "client_payload": {
-                "backend_image": "${{ env.REGISTRY }}/${{ env.BACKEND_IMAGE }}:latest",
-                "processor_image": "${{ env.REGISTRY }}/${{ env.PROCESSOR_IMAGE }}:latest"
+                "backend_image": "${{ env.REGISTRY }}/${{ env.BACKEND_IMAGE }}:feature",
+                "processor_image": "${{ env.REGISTRY }}/${{ env.PROCESSOR_IMAGE }}:feature"
               }
             }'
