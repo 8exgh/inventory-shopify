@@ -5,7 +5,8 @@ export type EventType =
   | 'ProductWeightSet'
   | 'ProductReadyToBeCreated'
   | 'ProductCreated'
-  | 'ProductCreateFailed';
+  | 'ProductCreateFailed'
+  | 'ShopifyTokenReceived';
 
 export interface BeginProductCreatedData {
   shopifyProductId: string;
@@ -37,6 +38,13 @@ export interface ProductCreateFailedData {
   attemptNumber: number;
 }
 
+export interface ShopifyTokenReceivedData {
+  accessToken: string;
+  expiresAt: number;  // Unix timestamp ms
+  scope: string;
+  shop: string;
+}
+
 export type EventData =
   | BeginProductCreatedData
   | ColorEstimatedData
@@ -44,7 +52,8 @@ export type EventData =
   | ProductWeightSetData
   | ProductReadyToBeCreatedData
   | ProductCreatedData
-  | ProductCreateFailedData;
+  | ProductCreateFailedData
+  | ShopifyTokenReceivedData;
 
 // Matches database columns with snake case
 export interface Event {

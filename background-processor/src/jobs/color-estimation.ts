@@ -1,16 +1,13 @@
-import { getProductsNeedingColorEstimation, getProductImage, setEstimatedColor, setColorV2, getProductDetailsForShopify } from '../utils/api-client.js';
+import {
+  getProductsNeedingColorEstimation,
+  getProductImage,
+  setEstimatedColor,
+  setColorV2,
+  getProductDetailsForShopify,
+  getShopifyToken
+} from '../utils/api-client.js';
 import { estimateColor } from '../utils/color-estimation.js';
 import fetch from 'node-fetch';
-
-function getShopifyShopDomain(): string {
-  const SHOPIFY_SHOP_DOMAIN = process.env.SHOPIFY_SHOP_DOMAIN || '';
-  return SHOPIFY_SHOP_DOMAIN;
-}
-
-function getShopifyAccessToken(): string {
-  const SHOPIFY_ACCESS_TOKEN = process.env.SHOPIFY_ACCESS_TOKEN || '';
-  return SHOPIFY_ACCESS_TOKEN;
-}
 
 function getShopifyApiVersion(): string {
   const SHOPIFY_API_VERSION = process.env.SHOPIFY_API_VERSION || '2025-10';
@@ -31,11 +28,15 @@ const COLOR_RGB_REFERENCES: Record<string, { r: number; g: number; b: number }> 
   'Brown': { r: 139, g: 69, b: 19 }
 };
 
-async function getProductColors(shopifyProductId: string): Promise<string[]> {
-  const baseUrl = `https://${getShopifyShopDomain()}/admin/api/${getShopifyApiVersion()}`;
+async function getProductColors(
+  shopifyProductId: string,
+  accessToken: string,
+  shop: string
+): Promise<string[]> {
+  const baseUrl = `https://${shop}/admin/api/${getShopifyApiVersion()}`;
   const response = await fetch(`${baseUrl}/products/${shopifyProductId}/variants.json`, {
     headers: {
-      'X-Shopify-Access-Token': getShopifyAccessToken(),
+      'X-Shopify-Access-Token': accessToken,
       'Content-Type': 'application/json'
     }
   });
@@ -103,6 +104,15 @@ export async function runColorEstimationJob(): Promise<void> {
       try {
         console.log(`[Color Estimation] Processing ${task.aggregateId}...`);
 
+        // Get user's Shopify token
+        const tokenResult = await getShopifyToken(task.userId);
+        if (!tokenResult) {
+          console.warn(`[Color Estimation] No valid Shopify token for user ${task.userId}, skipping ${task.aggregateId}`);
+          continue;
+        }
+
+        const { accessToken, shop } = tokenResult;
+
         // Get product details to get shopifyProductId
         const productDetails = await getProductDetailsForShopify(task.userId, task.aggregateId);
 
@@ -118,7 +128,7 @@ export async function runColorEstimationJob(): Promise<void> {
         console.log(`[Color Estimation] Set estimated color for ${task.aggregateId}`);
 
         // Get available colors from Shopify product
-        const availableColors = await getProductColors(productDetails.shopifyProductId);
+        const availableColors = await getProductColors(productDetails.shopifyProductId, accessToken, shop);
         console.log(`[Color Estimation] Available colors for product: ${availableColors.join(', ')}`);
 
         // Match estimated RGB to closest available color

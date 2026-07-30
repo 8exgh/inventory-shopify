@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { requireUserOrApiKey } from '@/lib/auth/middleware';
+import { requireUserOrApiKey, requireApiKey } from '@/lib/auth/middleware';
+import { getLatestShopifyToken } from '@/lib/queries/shopify-token-queries';
 
 const ProductWeightsSchema = z.object({
   userId: z.string().uuid(),
@@ -11,19 +12,19 @@ function getShopifyShopDomain(): string {
   return process.env.SHOPIFY_SHOP_DOMAIN || '';
 }
 
-function getShopifyAccessToken(): string {
-  return process.env.SHOPIFY_ACCESS_TOKEN || '';
-}
-
 function getShopifyApiVersion(): string {
   return process.env.SHOPIFY_API_VERSION || '2025-10';
 }
 
-async function getProductWeights(shopifyProductId: string): Promise<string[]> {
-  const baseUrl = `https://${getShopifyShopDomain()}/admin/api/${getShopifyApiVersion()}`;
+async function getProductWeights(
+  shopifyProductId: string,
+  accessToken: string,
+  shop: string
+): Promise<string[]> {
+  const baseUrl = `https://${shop}/admin/api/${getShopifyApiVersion()}`;
   const response = await fetch(`${baseUrl}/products/${shopifyProductId}/variants.json`, {
     headers: {
-      'X-Shopify-Access-Token': getShopifyAccessToken(),
+      'X-Shopify-Access-Token': accessToken,
       'Content-Type': 'application/json'
     }
   });
@@ -70,7 +71,20 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const weights = await getProductWeights(validation.data.shopifyProductId);
+    // Get user's Shopify token
+    const token = getLatestShopifyToken(validatedUserId);
+    if (!token) {
+      return NextResponse.json(
+        { error: 'Shopify not connected', code: 'SHOPIFY_NOT_CONNECTED' },
+        { status: 401 }
+      );
+    }
+
+    const weights = await getProductWeights(
+      validation.data.shopifyProductId,
+      token.accessToken,
+      token.shop
+    );
 
     return NextResponse.json({ weights });
   } catch (error: any) {

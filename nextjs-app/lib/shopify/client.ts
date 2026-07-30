@@ -1,19 +1,11 @@
-import { shopifyApi } from '@shopify/shopify-api';
 import '@shopify/shopify-api/adapters/node';
 
 function getShopifyShopDomain(): string {
-  const SHOPIFY_SHOP_DOMAIN = process.env.SHOPIFY_SHOP_DOMAIN || '';
-  return SHOPIFY_SHOP_DOMAIN;
-}
-
-function getShopifyAccessToken(): string {
-  const SHOPIFY_ACCESS_TOKEN = process.env.SHOPIFY_ACCESS_TOKEN || '';
-  return SHOPIFY_ACCESS_TOKEN;;
+  return process.env.SHOPIFY_SHOP_DOMAIN || '';
 }
 
 function getShopifyApiVersion(): string {
-  const SHOPIFY_API_VERSION = process.env.SHOPIFY_API_VERSION || '2025-10';
-  return SHOPIFY_API_VERSION;
+  return process.env.SHOPIFY_API_VERSION || '2025-10';
 }
 
 export interface ShopifyProduct {
@@ -44,10 +36,11 @@ export class ShopifyClient {
   private baseUrl: string;
   private headers: Record<string, string>;
 
-  constructor() {
-    this.baseUrl = `https://${getShopifyShopDomain()}/admin/api/${getShopifyApiVersion()}`;
+  constructor(accessToken: string, shop?: string) {
+    const shopDomain = shop || getShopifyShopDomain();
+    this.baseUrl = `https://${shopDomain}/admin/api/${getShopifyApiVersion()}`;
     this.headers = {
-      'X-Shopify-Access-Token': getShopifyAccessToken(),
+      'X-Shopify-Access-Token': accessToken,
       'Content-Type': 'application/json',
     };
   }
@@ -189,4 +182,9 @@ export class ShopifyClient {
   }
 }
 
-export const shopifyClient = new ShopifyClient();
+/**
+ * Factory function to create a ShopifyClient with a specific access token.
+ */
+export function createShopifyClient(accessToken: string, shop?: string): ShopifyClient {
+  return new ShopifyClient(accessToken, shop);
+}
