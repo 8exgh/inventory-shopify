@@ -24,6 +24,9 @@ export interface ProductStateResult {
   color?: string;
   weight?: string;
   errorMessage?: string;
+  imageProcessed?: boolean;
+  imageProcessingFailureCount?: number;
+  imageProcessingError?: string;
 }
 
 export interface UserProduct {

@@ -49,6 +49,25 @@ export function replayEvents(events: Event[]): ProductState {
           failureCount: (state.failureCount || 0) + 1
         };
         break;
+
+      case 'ProductImageProcessed':
+        state = {
+          ...state,
+          imageProcessed: true,
+          processedImageMimeType: eventData.mimeType,
+          imageProcessingError: undefined
+        };
+        break;
+
+      case 'ProductImageProcessingFailed':
+        // Deliberately does not change status: a failed image edit leaves the
+        // product in data-entry so it can be retried, unlike a Shopify failure.
+        state = {
+          ...state,
+          imageProcessingError: eventData.errorMessage,
+          imageProcessingFailureCount: (state.imageProcessingFailureCount || 0) + 1
+        };
+        break;
     }
   }
 

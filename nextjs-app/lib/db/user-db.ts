@@ -84,13 +84,20 @@ export function getEventsByType(userId: string, eventType: string): Event[] {
     .all(eventType) as Event[];
 }
 
-export function getPhotoBlob(userId: string, aggregateId: string): Buffer | null {
+export function getPhotoBlob(
+  userId: string,
+  aggregateId: string,
+  eventType: string = 'BeginProductCreated'
+): Buffer | null {
   const db = getUserDb(userId);
+  // Ordered so that if a retry ever writes a second blob-carrying event
+  // (e.g. ProductImageProcessed), the most recent one wins.
   const result = db.prepare(`
     SELECT photo_blob FROM events
-    WHERE aggregate_id = ? AND event_type = 'BeginProductCreated'
+    WHERE aggregate_id = ? AND event_type = ?
+    ORDER BY version DESC
     LIMIT 1
-  `).get(aggregateId) as { photo_blob: Buffer | null } | undefined;
+  `).get(aggregateId, eventType) as { photo_blob: Buffer | null } | undefined;
 
   return result?.photo_blob || null;
 }

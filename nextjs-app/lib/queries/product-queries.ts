@@ -22,7 +22,10 @@ export function getProductState(userId: string, aggregateId: string): ProductSta
     estimatedColor: state.estimatedColor,
     color: state.color,
     weight: state.weight,
-    errorMessage: state.errorMessage
+    errorMessage: state.errorMessage,
+    imageProcessed: state.imageProcessed || false,
+    imageProcessingFailureCount: state.imageProcessingFailureCount || 0,
+    imageProcessingError: state.imageProcessingError
   };
 }
 
@@ -84,6 +87,42 @@ export function getProductsNeedingColorEstimation(): ProductTask[] {
   return tasks;
 }
 
+export const MAX_IMAGE_PROCESSING_ATTEMPTS = 5;
+
+export function getProductsNeedingImageProcessing(): ProductTask[] {
+  const tasks: ProductTask[] = [];
+  const userIds = getAllUserDatabases();
+
+  for (const userId of userIds) {
+    const allEvents = loadAllEvents(userId);
+
+    // Group events by aggregateId
+    const eventsByAggregate: Map<string, Event[]> = new Map();
+    for (const event of allEvents) {
+      if (!eventsByAggregate.has(event.aggregate_id)) {
+        eventsByAggregate.set(event.aggregate_id, []);
+      }
+      eventsByAggregate.get(event.aggregate_id)!.push(event);
+    }
+
+    // Find aggregates that have a photo but no processed image, and have not
+    // exhausted their retries
+    for (const [aggregateId, events] of eventsByAggregate) {
+      const state = replayEvents(events);
+
+      const hasBegun = events.some(e => e.event_type === 'BeginProductCreated');
+      const hasProcessed = events.some(e => e.event_type === 'ProductImageProcessed');
+      const failureCount = state.imageProcessingFailureCount || 0;
+
+      if (hasBegun && !hasProcessed && failureCount < MAX_IMAGE_PROCESSING_ATTEMPTS) {
+        tasks.push({ userId, aggregateId });
+      }
+    }
+  }
+
+  return tasks;
+}
+
 export function getProductsToCreateInShopify(): ProductTask[] {
   const tasks: ProductTask[] = [];
   const userIds = getAllUserDatabases();
@@ -106,9 +145,11 @@ export function getProductsToCreateInShopify(): ProductTask[] {
 
       const hasReadyEvent = events.some(e => e.event_type === 'ProductReadyToBeCreated');
       const hasCreatedEvent = events.some(e => e.event_type === 'ProductCreated');
+      // Shopify receives the processed image, so creation waits for it
+      const hasProcessedImage = events.some(e => e.event_type === 'ProductImageProcessed');
       const failureCount = state.failureCount || 0;
 
-      if (hasReadyEvent && !hasCreatedEvent && failureCount < 5) {
+      if (hasReadyEvent && !hasCreatedEvent && hasProcessedImage && failureCount < 5) {
         tasks.push({ userId, aggregateId });
       }
     }
@@ -138,21 +179,28 @@ export function getProductDetailsForShopify(userId: string, aggregateId: string)
   };
 }
 
-export function getProductImage(userId: string, aggregateId: string): { blob: Buffer; mimeType: string } | null {
+export function getProductImage(
+  userId: string,
+  aggregateId: string,
+  variant: 'original' | 'processed' = 'original'
+): { blob: Buffer; mimeType: string } | null {
   const events = loadEvents(userId, aggregateId);
   if (events.length === 0) {
     return null;
   }
 
   const state = replayEvents(events);
-  const photoBlob = getPhotoBlob(userId, aggregateId);
 
-  if (!photoBlob || !state.photoMimeType) {
+  const eventType = variant === 'processed' ? 'ProductImageProcessed' : 'BeginProductCreated';
+  const mimeType = variant === 'processed' ? state.processedImageMimeType : state.photoMimeType;
+  const photoBlob = getPhotoBlob(userId, aggregateId, eventType);
+
+  if (!photoBlob || !mimeType) {
     return null;
   }
 
   return {
     blob: photoBlob,
-    mimeType: state.photoMimeType
+    mimeType
   };
 }

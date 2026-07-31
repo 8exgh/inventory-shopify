@@ -1,5 +1,6 @@
 import dotenv from 'dotenv';
 import { runColorEstimationJob } from './jobs/color-estimation.js';
+import { runImageProcessingJob } from './jobs/image-processing.js';
 import { runShopifyCreationJob } from './jobs/shopify-creation.js';
 
 // Load environment variables
@@ -27,6 +28,9 @@ async function runJobLoop(): Promise<void> {
 
       // Run color estimation job
       await runColorEstimationJob();
+
+      // Run image processing job
+      await runImageProcessingJob();
 
       // Run Shopify creation job
       await runShopifyCreationJob();

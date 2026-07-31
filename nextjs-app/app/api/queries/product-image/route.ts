@@ -17,6 +17,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get('userId');
     const aggregateId = searchParams.get('aggregateId');
+    const variant = searchParams.get('variant') === 'processed' ? 'processed' : 'original';
 
     if (!userId || !aggregateId) {
       return NextResponse.json(
@@ -26,7 +27,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Get image
-    const image = getProductImage(userId, aggregateId);
+    const image = getProductImage(userId, aggregateId, variant);
 
     if (!image) {
       return NextResponse.json(

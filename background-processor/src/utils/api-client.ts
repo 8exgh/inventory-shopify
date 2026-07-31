@@ -23,6 +23,15 @@ export interface ProductDetails {
   weight: string | null;
 }
 
+export interface ProductStateResult {
+  status: 'data-entry' | 'creating' | 'created' | 'failed';
+  shopifyProductId: string;
+  shopifyProductTitle: string;
+  imageProcessed?: boolean;
+  imageProcessingFailureCount?: number;
+  imageProcessingError?: string;
+}
+
 export interface ShopifyProduct {
   id: string;
   title: string;
@@ -45,9 +54,26 @@ export async function getProductsNeedingColorEstimation(): Promise<ProductTask[]
   return data.tasks;
 }
 
-export async function getProductImage(userId: string, aggregateId: string): Promise<Buffer> {
+export async function getProductsNeedingImageProcessing(): Promise<ProductTask[]> {
+  const response = await fetch(`${getApiUrl()}/api/queries/products-needing-image-processing`, {
+    headers: { 'X-API-Key':  getApiKey() },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to get products: ${response.statusText}`);
+  }
+
+  const data = await response.json() as any;
+  return data.tasks;
+}
+
+export async function getProductImage(
+  userId: string,
+  aggregateId: string,
+  variant: 'original' | 'processed' = 'original'
+): Promise<Buffer> {
   const response = await fetch(
-    `${getApiUrl()}/api/queries/product-image?userId=${userId}&aggregateId=${aggregateId}`,
+    `${getApiUrl()}/api/queries/product-image?userId=${userId}&aggregateId=${aggregateId}&variant=${variant}`,
     { headers: { 'X-API-Key': getApiKey() } }
   );
 
@@ -57,6 +83,62 @@ export async function getProductImage(userId: string, aggregateId: string): Prom
 
   const buffer = await response.arrayBuffer();
   return Buffer.from(buffer);
+}
+
+export async function getProductState(userId: string, aggregateId: string): Promise<ProductStateResult> {
+  const response = await fetch(
+    `${getApiUrl()}/api/queries/product-state?userId=${userId}&aggregateId=${aggregateId}`,
+    { headers: { 'X-API-Key': getApiKey() } }
+  );
+
+  if (!response.ok) {
+    throw new Error(`Failed to get product state: ${response.statusText}`);
+  }
+
+  return await response.json() as ProductStateResult;
+}
+
+export async function recordProductImageProcessed(
+  userId: string,
+  aggregateId: string,
+  imageBlob: string,
+  mimeType: string,
+  backgroundHex: string,
+  model: string,
+  sizePx: number
+): Promise<void> {
+  const response = await fetch(`${getApiUrl()}/api/commands/record-product-image-processed`, {
+    method: 'POST',
+    headers: {
+      'X-API-Key': getApiKey(),
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ userId, aggregateId, imageBlob, mimeType, backgroundHex, model, sizePx })
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to record processed image: ${response.statusText}`);
+  }
+}
+
+export async function recordProductImageProcessingFailed(
+  userId: string,
+  aggregateId: string,
+  errorMessage: string,
+  attemptNumber: number
+): Promise<void> {
+  const response = await fetch(`${getApiUrl()}/api/commands/record-product-image-processing-failed`, {
+    method: 'POST',
+    headers: {
+      'X-API-Key': getApiKey(),
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ userId, aggregateId, errorMessage, attemptNumber })
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to record image processing failure: ${response.statusText}`);
+  }
 }
 
 export async function recordProductColor(

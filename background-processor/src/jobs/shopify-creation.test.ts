@@ -1,4 +1,4 @@
-import { describe, it, expect, jest, beforeEach } from '@jest/globals';
+import { describe, it, expect, jest, beforeEach, afterEach } from '@jest/globals';
 import { createVariant } from './shopify-creation.js';
 
 // Mock environment variables
@@ -9,9 +9,23 @@ process.env.SHOPIFY_LOCATION_ID = '12345678';
 describe('createVariant', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    // Without this the test issues a real request to the shop domain below.
+    global.fetch = jest.fn() as any;
+  });
+
+  afterEach(() => {
+    delete (global as any).fetch;
   });
 
   it('should create a Shopify variant and return the variant ID', async () => {
+    // Arrange: variant creation, then the inventory level call
+    (global.fetch as any)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ variant: { id: 67890, inventory_item_id: 1122334455 } })
+      })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({}) });
+
     // Arrange
     const productId = '12345';
     const colorName = 'Blue';

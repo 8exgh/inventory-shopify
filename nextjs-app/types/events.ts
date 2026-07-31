@@ -6,6 +6,8 @@ export type EventType =
   | 'ProductReadyToBeCreated'
   | 'ProductCreated'
   | 'ProductCreateFailed'
+  | 'ProductImageProcessed'
+  | 'ProductImageProcessingFailed'
   | 'ShopifyTokenReceived';
 
 export interface BeginProductCreatedData {
@@ -38,6 +40,18 @@ export interface ProductCreateFailedData {
   attemptNumber: number;
 }
 
+export interface ProductImageProcessedData {
+  mimeType: string;
+  backgroundHex: string;
+  model: string;
+  sizePx: number;
+}
+
+export interface ProductImageProcessingFailedData {
+  errorMessage: string;
+  attemptNumber: number;
+}
+
 export interface ShopifyTokenReceivedData {
   accessToken: string;
   expiresAt: number;  // Unix timestamp ms
@@ -53,6 +67,8 @@ export type EventData =
   | ProductReadyToBeCreatedData
   | ProductCreatedData
   | ProductCreateFailedData
+  | ProductImageProcessedData
+  | ProductImageProcessingFailedData
   | ShopifyTokenReceivedData;
 
 // Matches database columns with snake case
@@ -77,4 +93,8 @@ export interface ProductState {
   shopifyVariantId?: string;
   errorMessage?: string;
   failureCount?: number;
+  imageProcessed?: boolean;
+  processedImageMimeType?: string;
+  imageProcessingFailureCount?: number;
+  imageProcessingError?: string;
 }

@@ -90,6 +90,12 @@ POLLING_INTERVAL_MS=5000
 SHOPIFY_SHOP_DOMAIN=your-store.myshopify.com
 SHOPIFY_ACCESS_TOKEN=<your-shopify-admin-token>
 SHOPIFY_API_VERSION=2024-10
+
+OPENAI_API_KEY=<your-openai-api-key>
+OPENAI_IMAGE_MODEL=gpt-image-2
+IMAGE_BACKGROUND_HEX=#ADD8E6
+IMAGE_CANVAS_SIZE=1024
+IMAGE_MARGIN_PX=48
 ```
 
 ### 5. Run the Applications
@@ -175,14 +181,17 @@ npm start
 - `POST /api/commands/finish-create-product`
 - `POST /api/commands/record-product-created-in-shopify` (API key only)
 - `POST /api/commands/record-product-failed-in-shopify` (API key only)
+- `POST /api/commands/record-product-image-processed` (API key only)
+- `POST /api/commands/record-product-image-processing-failed` (API key only)
 
 ### Queries
 
 - `GET /api/queries/shopify-products` - List Shopify products
 - `GET /api/queries/user-products` - User's products
 - `GET /api/queries/product-state` - Product status
-- `GET /api/queries/product-image` - Product photo
+- `GET /api/queries/product-image` - Product photo (`?variant=original|processed`, defaults to `original`)
 - `GET /api/queries/products-needing-color-estimation` (API key only)
+- `GET /api/queries/products-needing-image-processing` (API key only)
 - `GET /api/queries/products-to-create-in-shopify` (API key only)
 - `GET /api/queries/product-details-for-shopify` (API key only)
 
@@ -217,12 +226,16 @@ CREATE TABLE events (
 
 ## Event Types
 
-1. **BeginProductCreated** - Product creation started
+1. **BeginProductCreated** - Product creation started (carries the photo blob)
 2. **ColorEstimated** - Color estimated by background processor
-3. **ProductWeightSet** - Weight entered by user
-4. **ProductReadyToBeCreated** - Ready for Shopify creation
-5. **ProductCreated** - Successfully created in Shopify
-6. **ProductCreateFailed** - Failed to create (with retry count)
+3. **ColorSetV2** - Estimated RGB matched to an available Shopify color name
+4. **ProductWeightSet** - Weight entered by user
+5. **ProductReadyToBeCreated** - Ready for Shopify creation
+6. **ProductCreated** - Successfully created in Shopify
+7. **ProductCreateFailed** - Failed to create (with retry count)
+8. **ProductImageProcessed** - Disc centered on the light blue canvas (carries the processed blob)
+9. **ProductImageProcessingFailed** - Image processing failed (with retry count)
+10. **ShopifyTokenReceived** - OAuth token stored on the `shopify-auth` aggregate
 
 ## Product States
 
@@ -241,15 +254,33 @@ CREATE TABLE events (
 4. Calculates average RGB
 5. Records color via command API
 
-### Job 2: Shopify Creation
+### Job 2: Image Processing
 
-1. Polls for products ready to create
+1. Polls for products with a photo but no processed image
+2. Reads the **original** photo (never the processed one — Job 1 depends on it)
+3. Sends it to OpenAI `images/edits` (`gpt-image-2`) to replace the surroundings with light blue
+4. Uses `sharp` to trim to the disc's bounding box and re-center it on an exact
+   `IMAGE_CANVAS_SIZE` canvas filled with `IMAGE_BACKGROUND_HEX`
+5. Records `ProductImageProcessed` with the resulting PNG
+6. Retries up to 5 times, recording `ProductImageProcessingFailed` each time
+
+The generative step handles background replacement only; centering, canvas size,
+margin, and the exact background color are done deterministically in `sharp`, so
+they do not depend on how precisely the model framed the image.
+
+### Job 3: Shopify Creation
+
+1. Polls for products ready to create **and already image-processed**
 2. Maps RGB to color name
 3. Ensures unique weight variant
-4. Uploads image to Shopify
+4. Uploads the **processed** image to Shopify
 5. Creates variant with photo, color, weight
 6. Records success/failure
 7. Retries up to 5 times on failure
+
+Note: because Shopify creation waits for the processed image, a product whose
+image processing fails all 5 attempts stays in `data-entry` and is never created.
+The product page surfaces this.
 
 ## Development Notes
 

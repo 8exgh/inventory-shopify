@@ -44,3 +44,20 @@ export interface RecordProductFailedInShopifyCommand {
   errorMessage: string;
   attemptNumber: number;
 }
+
+export interface RecordProductImageProcessedCommand {
+  userId: string;
+  aggregateId: string;
+  imageBlob: string; // base64
+  mimeType: string;
+  backgroundHex: string;
+  model: string;
+  sizePx: number;
+}
+
+export interface RecordProductImageProcessingFailedCommand {
+  userId: string;
+  aggregateId: string;
+  errorMessage: string;
+  attemptNumber: number;
+}

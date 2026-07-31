@@ -7,7 +7,9 @@ import {
   SetColorV2Command,
   FinishCreateProductCommand,
   RecordProductCreatedInShopifyCommand,
-  RecordProductFailedInShopifyCommand
+  RecordProductFailedInShopifyCommand,
+  RecordProductImageProcessedCommand,
+  RecordProductImageProcessingFailedCommand
 } from '@/types/commands';
 
 export function handleBeginCreateProduct(command: BeginCreateProductCommand): void {
@@ -165,6 +167,54 @@ export function handleRecordProductFailedInShopify(command: RecordProductFailedI
   insertEvent(userId, {
     aggregateId,
     eventType: 'ProductCreateFailed',
+    eventData: JSON.stringify({ errorMessage, attemptNumber }),
+    timestamp: Date.now(),
+    version: events.length + 1
+  });
+}
+
+export function handleRecordProductImageProcessed(command: RecordProductImageProcessedCommand): void {
+  const { userId, aggregateId, imageBlob, mimeType, backgroundHex, model, sizePx } = command;
+
+  // Load existing events
+  const events = loadEvents(userId, aggregateId);
+  const state = replayEvents(events);
+
+  // Validate: Must have started product creation
+  if (state.status === 'not-started') {
+    throw new Error('Product creation not started');
+  }
+
+  // Convert base64 to buffer
+  const imageBuffer = Buffer.from(imageBlob, 'base64');
+
+  // Insert ProductImageProcessed event
+  insertEvent(userId, {
+    aggregateId,
+    eventType: 'ProductImageProcessed',
+    eventData: JSON.stringify({ mimeType, backgroundHex, model, sizePx }),
+    photoBlob: imageBuffer,
+    timestamp: Date.now(),
+    version: events.length + 1
+  });
+}
+
+export function handleRecordProductImageProcessingFailed(command: RecordProductImageProcessingFailedCommand): void {
+  const { userId, aggregateId, errorMessage, attemptNumber } = command;
+
+  // Load existing events
+  const events = loadEvents(userId, aggregateId);
+  const state = replayEvents(events);
+
+  // Validate: Must have started product creation
+  if (state.status === 'not-started') {
+    throw new Error('Product creation not started');
+  }
+
+  // Insert ProductImageProcessingFailed event
+  insertEvent(userId, {
+    aggregateId,
+    eventType: 'ProductImageProcessingFailed',
     eventData: JSON.stringify({ errorMessage, attemptNumber }),
     timestamp: Date.now(),
     version: events.length + 1

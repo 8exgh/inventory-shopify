@@ -12,7 +12,12 @@ interface ProductState {
   color?: string;
   weight?: string;
   errorMessage?: string;
+  imageProcessed?: boolean;
+  imageProcessingFailureCount?: number;
+  imageProcessingError?: string;
 }
+
+const MAX_IMAGE_PROCESSING_ATTEMPTS = 5;
 
 export default function ProductDetail() {
   const [productState, setProductState] = useState<ProductState | null>(null);
@@ -36,7 +41,7 @@ export default function ProductDetail() {
 
   // Load product image
   useEffect(() => {
-    loadProductImage();
+    loadProductImage('original');
 
     // Cleanup object URL on unmount
     return () => {
@@ -46,13 +51,20 @@ export default function ProductDetail() {
     };
   }, [aggregateId]);
 
-  async function loadProductImage() {
+  // Swap in the centered image once the background processor has produced it
+  useEffect(() => {
+    if (productState?.imageProcessed) {
+      loadProductImage('processed');
+    }
+  }, [productState?.imageProcessed]);
+
+  async function loadProductImage(variant: 'original' | 'processed') {
     try {
       const token = localStorage.getItem('token');
       const userId = localStorage.getItem('userId');
 
       const response = await fetch(
-        `/api/queries/product-image?userId=${userId}&aggregateId=${aggregateId}`,
+        `/api/queries/product-image?userId=${userId}&aggregateId=${aggregateId}&variant=${variant}`,
         { headers: { 'Authorization': `Bearer ${token}` } }
       );
 
@@ -329,10 +341,30 @@ export default function ProductDetail() {
               </div>
             )}
 
+            {canEdit && !productState.imageProcessed &&
+              (productState.imageProcessingFailureCount || 0) < MAX_IMAGE_PROCESSING_ATTEMPTS && (
+              <div className="p-3 bg-blue-50 text-blue-700 rounded text-sm">
+                Preparing image&hellip; centering the disc and replacing the background.
+              </div>
+            )}
+
+            {/* Shopify creation is gated on the processed image, so an exhausted
+                retry budget blocks the product entirely and must be visible. */}
+            {canEdit && !productState.imageProcessed &&
+              (productState.imageProcessingFailureCount || 0) >= MAX_IMAGE_PROCESSING_ATTEMPTS && (
+              <div className="p-3 bg-red-100 text-red-700 rounded text-sm">
+                Image processing failed after {productState.imageProcessingFailureCount} attempts:{' '}
+                {productState.imageProcessingError}
+                <div className="mt-1 text-xs">
+                  This product cannot be created in Shopify until the image is processed.
+                </div>
+              </div>
+            )}
+
             {canEdit && (
               <button
                 onClick={handleFinish}
-                disabled={loading || !weight || !productState.estimatedColor || !productState.color}
+                disabled={loading || !weight || !productState.estimatedColor || !productState.color || !productState.imageProcessed}
                 className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:bg-gray-400"
               >
                 {loading ? 'Creating...' : 'Create in Shopify'}

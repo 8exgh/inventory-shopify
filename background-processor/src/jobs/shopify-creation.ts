@@ -275,8 +275,10 @@ export async function runShopifyCreationJob(): Promise<void> {
                 const details = await getProductDetailsForShopify(task.userId, task.aggregateId);
                 console.log(`[Shopify Creation] Details:`, details);
 
-                // Get image
-                const imageBuffer = await getProductImage(task.userId, task.aggregateId);
+                // Get the centered image on the light blue canvas. The work
+                // query guarantees ProductImageProcessed exists before a
+                // product reaches this job.
+                const imageBuffer = await getProductImage(task.userId, task.aggregateId, 'processed');
                 const imageBase64 = imageBuffer.toString('base64');
 
                 // Get existing variants to determine available weights
