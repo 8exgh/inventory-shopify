@@ -2,6 +2,19 @@
 
 A complete CQRS + Event Sourcing system for managing disc golf inventory on Shopify. Built with Next.js, TypeScript, SQLite, and follows the Adam Dymitruk / Martin Dilger event sourcing approach.
 
+## Screenshot
+
+<p align="center">
+  <img src="docs/screenshot-product-detail.png" alt="Product detail screen: the disc centered on a light blue canvas, the color estimated from the photo, and the weight ready for submission to Shopify" width="480">
+</p>
+
+The product detail screen after both background jobs have run: the disc has been
+centered on the light blue canvas by the image processing job, and its color has
+been estimated from the original photo and matched to an available Shopify color.
+Once a weight is entered, the variant can be created.
+
+> Screenshot taken against a throwaway database with sample data.
+
 ## Architecture Overview
 
 ### Components
