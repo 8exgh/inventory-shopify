@@ -15,6 +15,7 @@ function getPollingIntervalms(): number {
 console.log('=================================');
 console.log('Background Processor Starting');
 console.log('=================================');
+console.log(`Build: ${process.env.GIT_COMMIT || 'dev'} (${process.env.BUILD_TIME || 'unknown build time'})`);
 console.log(`NextJS API URL: ${process.env.NEXTJS_API_URL}`);
 console.log(`Polling Interval: ${getPollingIntervalms()}ms`);
 console.log('=================================');

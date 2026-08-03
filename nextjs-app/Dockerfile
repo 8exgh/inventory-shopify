@@ -12,6 +12,12 @@ RUN npm ci
 # Copy source code
 COPY . ./
 
+# Build metadata, available while prerendering static pages
+ARG GIT_COMMIT=unknown
+ARG BUILD_TIME=unknown
+ENV GIT_COMMIT=$GIT_COMMIT
+ENV BUILD_TIME=$BUILD_TIME
+
 # Build Next.js app (creates .next directory)
 RUN npm run build
 
@@ -38,6 +44,12 @@ RUN mkdir -p /data
 ENV NODE_ENV=production
 ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
+
+# Build metadata, for pages rendered at request time
+ARG GIT_COMMIT=unknown
+ARG BUILD_TIME=unknown
+ENV GIT_COMMIT=$GIT_COMMIT
+ENV BUILD_TIME=$BUILD_TIME
 
 # Expose backend port
 EXPOSE 3000

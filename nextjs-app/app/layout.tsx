@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import './globals.css'
+import { BuildInfoFooter } from '@/components/BuildInfoFooter'
 
 export const metadata: Metadata = {
   title: 'Disc Golf Inventory Manager',
@@ -13,7 +14,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        {children}
+        <BuildInfoFooter />
+      </body>
     </html>
   )
 }

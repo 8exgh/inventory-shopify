@@ -31,6 +31,10 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Record build time
+        id: buildinfo
+        run: echo "time=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> "$GITHUB_OUTPUT"
+
       - name: Extract metadata (Backend)
         id: meta
         uses: docker/metadata-action@v5
@@ -48,6 +52,9 @@ jobs:
           context: ./nextjs-app
           file: ./nextjs-app/Dockerfile
           push: true
+          build-args: |
+            GIT_COMMIT=${{ github.sha }}
+            BUILD_TIME=${{ steps.buildinfo.outputs.time }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha,scope=backend
@@ -73,6 +80,10 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Record build time
+        id: buildinfo
+        run: echo "time=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> "$GITHUB_OUTPUT"
+
       - name: Extract metadata (Processor)
         id: meta
         uses: docker/metadata-action@v5
@@ -90,6 +101,9 @@ jobs:
           context: ./background-processor
           file: ./background-processor/Dockerfile
           push: true
+          build-args: |
+            GIT_COMMIT=${{ github.sha }}
+            BUILD_TIME=${{ steps.buildinfo.outputs.time }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha,scope=processor

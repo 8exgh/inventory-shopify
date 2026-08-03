@@ -31,12 +31,19 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Record build time
+        id: buildinfo
+        run: echo "time=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> "$GITHUB_OUTPUT"
+
       - name: Build and push Backend Docker image
         uses: docker/build-push-action@v5
         with:
           context: ./nextjs-app
           file: ./nextjs-app/Dockerfile
           push: true
+          build-args: |
+            GIT_COMMIT=${{ github.sha }}
+            BUILD_TIME=${{ steps.buildinfo.outputs.time }}
           tags: ${{ env.REGISTRY }}/${{ env.BACKEND_IMAGE }}:rework
           cache-from: type=gha,scope=backend
           cache-to: type=gha,mode=max,scope=backend
@@ -61,12 +68,19 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Record build time
+        id: buildinfo
+        run: echo "time=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> "$GITHUB_OUTPUT"
+
       - name: Build and push Processor Docker image
         uses: docker/build-push-action@v5
         with:
           context: ./background-processor
           file: ./background-processor/Dockerfile
           push: true
+          build-args: |
+            GIT_COMMIT=${{ github.sha }}
+            BUILD_TIME=${{ steps.buildinfo.outputs.time }}
           tags: ${{ env.REGISTRY }}/${{ env.PROCESSOR_IMAGE }}:rework
           cache-from: type=gha,scope=processor
           cache-to: type=gha,mode=max,scope=processor

@@ -36,5 +36,11 @@ COPY --from=builder /app/dist ./dist
 ENV NODE_ENV=production
 ENV POLLING_INTERVAL_MS=5000
 
+# Build metadata, logged at startup
+ARG GIT_COMMIT=unknown
+ARG BUILD_TIME=unknown
+ENV GIT_COMMIT=$GIT_COMMIT
+ENV BUILD_TIME=$BUILD_TIME
+
 # Start background processor (change this line)
 CMD ["node", "dist/index.js"]
