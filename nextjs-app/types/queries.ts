@@ -4,6 +4,7 @@ export interface ShopifyProduct {
 }
 
 export interface ProductTask {
+  tenantId: string;
   aggregateId: string;
 }
 

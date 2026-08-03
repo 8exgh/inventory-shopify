@@ -13,8 +13,15 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // All staff share the store's inventory, so everyone sees every disc
-    const products = getStoreProducts();
+    if (!auth.tenantId) {
+      return NextResponse.json(
+        { error: 'This query requires a user session' },
+        { status: 403 }
+      );
+    }
+
+    // All staff of a tenant share its inventory, so everyone sees every disc
+    const products = getStoreProducts(auth.tenantId);
 
     return NextResponse.json({ products });
   } catch (error: any) {

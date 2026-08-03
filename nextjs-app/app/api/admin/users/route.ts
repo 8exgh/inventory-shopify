@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/auth/middleware';
-import { getAllUsers } from '@/lib/db/system';
+import { getUsersByTenant } from '@/lib/db/system';
 
 export async function GET(request: NextRequest) {
   try {
@@ -13,8 +13,17 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Get all users
-    const users = getAllUsers();
+    // API keys pass requireAdmin but carry no tenant; user management is
+    // strictly a human-admin operation
+    if (!auth.tenantId) {
+      return NextResponse.json(
+        { error: 'This operation requires an admin session' },
+        { status: 403 }
+      );
+    }
+
+    // Get the admin's tenant's users
+    const users = getUsersByTenant(auth.tenantId);
 
     // Remove password_hash from response
     const sanitizedUsers = users.map(user => ({

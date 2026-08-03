@@ -9,7 +9,6 @@ export default function Home() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [isFirstUser, setIsFirstUser] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -18,27 +17,7 @@ export default function Home() {
     if (token) {
       router.push('/dashboard');
     }
-
-    // Check if this is first time setup
-    checkFirstUser();
   }, []);
-
-  async function checkFirstUser() {
-    try {
-      const response = await fetch('/api/auth/check-first-user');
-      if (response.ok) {
-        const data = await response.json();
-        setIsFirstUser(data.isFirstUser);
-        // Automatically switch to registration mode for first user
-        if (data.isFirstUser) {
-          setIsLogin(false);
-        }
-      }
-    } catch (error) {
-      // Assume not first user if check fails
-      setIsFirstUser(false);
-    }
-  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -46,7 +25,7 @@ export default function Home() {
     setError('');
 
     try {
-      const endpoint = isLogin || !isFirstUser ? '/api/auth/login' : '/api/auth/register';
+      const endpoint = isLogin ? '/api/auth/login' : '/api/auth/register';
       const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -82,9 +61,10 @@ export default function Home() {
           Disc Golf Inventory
         </h1>
 
-        {isFirstUser && !isLogin && (
-          <div className="mb-4 p-3 bg-blue-100 text-blue-700 rounded">
-            Create your admin account to get started
+        {!isLogin && (
+          <div className="mb-4 p-3 bg-blue-100 text-blue-700 rounded text-sm">
+            This creates your store's admin account &mdash; you'll connect your
+            Shopify store right after, then you can invite your staff.
           </div>
         )}
 
@@ -128,20 +108,21 @@ export default function Home() {
             disabled={loading}
             className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:bg-gray-400"
           >
-            {loading ? 'Please wait...' : isFirstUser && !isLogin ? 'Create Admin Account' : isLogin ? 'Login' : 'Register'}
+            {loading ? 'Please wait...' : isLogin ? 'Login' : 'Register your store'}
           </button>
         </form>
 
-        {!isFirstUser && (
-          <div className="mt-4 text-center">
-            <button
-              onClick={() => setIsLogin(!isLogin)}
-              className="text-blue-600 hover:text-blue-800 text-sm"
-            >
-              {isLogin ? 'Need an account? Contact admin' : 'Already have an account? Login'}
-            </button>
-          </div>
-        )}
+        <div className="mt-4 text-center">
+          <button
+            onClick={() => {
+              setIsLogin(!isLogin);
+              setError('');
+            }}
+            className="text-blue-600 hover:text-blue-800 text-sm"
+          >
+            {isLogin ? 'New here? Register your store' : 'Already have an account? Login'}
+          </button>
+        </div>
       </div>
     </div>
   );

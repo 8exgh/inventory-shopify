@@ -1,4 +1,4 @@
-import { loadEvents, insertEvent } from '@/lib/db/store-db';
+import { loadEvents, insertEvent } from '@/lib/db/tenant-db';
 import { replayEvents } from './event-replay';
 import {
   BeginCreateProductCommand,
@@ -11,11 +11,11 @@ import {
   RecordProductImageProcessingFailedCommand
 } from '@/types/commands';
 
-export function handleBeginCreateProduct(command: BeginCreateProductCommand): void {
+export function handleBeginCreateProduct(tenantId: string, command: BeginCreateProductCommand): void {
   const { aggregateId, shopifyProductId, shopifyProductTitle, photoBlob, photoMimeType, createdByUserId } = command;
 
   // Load existing events (should be none for new aggregate)
-  const events = loadEvents(aggregateId);
+  const events = loadEvents(tenantId, aggregateId);
   const state = replayEvents(events);
 
   // Validate: Cannot begin if already started
@@ -27,7 +27,7 @@ export function handleBeginCreateProduct(command: BeginCreateProductCommand): vo
   const photoBuffer = Buffer.from(photoBlob, 'base64');
 
   // Insert BeginProductCreated event
-  insertEvent({
+  insertEvent(tenantId, {
     aggregateId,
     eventType: 'BeginProductCreated',
     eventData: JSON.stringify({
@@ -42,11 +42,11 @@ export function handleBeginCreateProduct(command: BeginCreateProductCommand): vo
   });
 }
 
-export function handleSetEstimatedColor(command: SetEstimatedColorCommand): void {
+export function handleSetEstimatedColor(tenantId: string, command: SetEstimatedColorCommand): void {
   const { aggregateId, color } = command;
 
   // Load existing events
-  const events = loadEvents(aggregateId);
+  const events = loadEvents(tenantId, aggregateId);
   const state = replayEvents(events);
 
   // Validate: Must have started product creation
@@ -55,7 +55,7 @@ export function handleSetEstimatedColor(command: SetEstimatedColorCommand): void
   }
 
   // Insert ColorEstimated event
-  insertEvent({
+  insertEvent(tenantId, {
     aggregateId,
     eventType: 'ColorEstimated',
     eventData: JSON.stringify({ color }),
@@ -64,11 +64,11 @@ export function handleSetEstimatedColor(command: SetEstimatedColorCommand): void
   });
 }
 
-export function handleSetColorV2(command: SetColorV2Command): void {
+export function handleSetColorV2(tenantId: string, command: SetColorV2Command): void {
   const { aggregateId, colorName } = command;
 
   // Load existing events
-  const events = loadEvents(aggregateId);
+  const events = loadEvents(tenantId, aggregateId);
   const state = replayEvents(events);
 
   // Validate: Must have started product creation
@@ -77,7 +77,7 @@ export function handleSetColorV2(command: SetColorV2Command): void {
   }
 
   // Insert ColorSetV2 event (no validations as requested)
-  insertEvent({
+  insertEvent(tenantId, {
     aggregateId,
     eventType: 'ColorSetV2',
     eventData: JSON.stringify({ colorName }),
@@ -86,11 +86,11 @@ export function handleSetColorV2(command: SetColorV2Command): void {
   });
 }
 
-export function handleFinishCreateProduct(command: FinishCreateProductCommand): void {
+export function handleFinishCreateProduct(tenantId: string, command: FinishCreateProductCommand): void {
   const { aggregateId, weight } = command;
 
   // Load existing events
-  const events = loadEvents(aggregateId);
+  const events = loadEvents(tenantId, aggregateId);
   const state = replayEvents(events);
 
   // Validate: Must have started product creation
@@ -106,7 +106,7 @@ export function handleFinishCreateProduct(command: FinishCreateProductCommand): 
   const currentVersion = events.length;
 
   // Insert ProductWeightSet event
-  insertEvent({
+  insertEvent(tenantId, {
     aggregateId,
     eventType: 'ProductWeightSet',
     eventData: JSON.stringify({ weight }),
@@ -115,7 +115,7 @@ export function handleFinishCreateProduct(command: FinishCreateProductCommand): 
   });
 
   // Insert ProductReadyToBeCreated event
-  insertEvent({
+  insertEvent(tenantId, {
     aggregateId,
     eventType: 'ProductReadyToBeCreated',
     eventData: JSON.stringify({}),
@@ -124,11 +124,11 @@ export function handleFinishCreateProduct(command: FinishCreateProductCommand): 
   });
 }
 
-export function handleRecordProductCreatedInShopify(command: RecordProductCreatedInShopifyCommand): void {
+export function handleRecordProductCreatedInShopify(tenantId: string, command: RecordProductCreatedInShopifyCommand): void {
   const { aggregateId, shopifyVariantId, createdAt } = command;
 
   // Load existing events
-  const events = loadEvents(aggregateId);
+  const events = loadEvents(tenantId, aggregateId);
   const state = replayEvents(events);
 
   // Validate: Must be in creating status
@@ -137,7 +137,7 @@ export function handleRecordProductCreatedInShopify(command: RecordProductCreate
   }
 
   // Insert ProductCreated event
-  insertEvent({
+  insertEvent(tenantId, {
     aggregateId,
     eventType: 'ProductCreated',
     eventData: JSON.stringify({ shopifyVariantId, createdAt }),
@@ -146,11 +146,11 @@ export function handleRecordProductCreatedInShopify(command: RecordProductCreate
   });
 }
 
-export function handleRecordProductFailedInShopify(command: RecordProductFailedInShopifyCommand): void {
+export function handleRecordProductFailedInShopify(tenantId: string, command: RecordProductFailedInShopifyCommand): void {
   const { aggregateId, errorMessage, attemptNumber } = command;
 
   // Load existing events
-  const events = loadEvents(aggregateId);
+  const events = loadEvents(tenantId, aggregateId);
   const state = replayEvents(events);
 
   // Validate: Must be in creating status (or already failed and retrying)
@@ -159,7 +159,7 @@ export function handleRecordProductFailedInShopify(command: RecordProductFailedI
   }
 
   // Insert ProductCreateFailed event
-  insertEvent({
+  insertEvent(tenantId, {
     aggregateId,
     eventType: 'ProductCreateFailed',
     eventData: JSON.stringify({ errorMessage, attemptNumber }),
@@ -168,11 +168,11 @@ export function handleRecordProductFailedInShopify(command: RecordProductFailedI
   });
 }
 
-export function handleRecordProductImageProcessed(command: RecordProductImageProcessedCommand): void {
+export function handleRecordProductImageProcessed(tenantId: string, command: RecordProductImageProcessedCommand): void {
   const { aggregateId, imageBlob, mimeType, backgroundHex, model, sizePx } = command;
 
   // Load existing events
-  const events = loadEvents(aggregateId);
+  const events = loadEvents(tenantId, aggregateId);
   const state = replayEvents(events);
 
   // Validate: Must have started product creation
@@ -184,7 +184,7 @@ export function handleRecordProductImageProcessed(command: RecordProductImagePro
   const imageBuffer = Buffer.from(imageBlob, 'base64');
 
   // Insert ProductImageProcessed event
-  insertEvent({
+  insertEvent(tenantId, {
     aggregateId,
     eventType: 'ProductImageProcessed',
     eventData: JSON.stringify({ mimeType, backgroundHex, model, sizePx }),
@@ -194,11 +194,11 @@ export function handleRecordProductImageProcessed(command: RecordProductImagePro
   });
 }
 
-export function handleRecordProductImageProcessingFailed(command: RecordProductImageProcessingFailedCommand): void {
+export function handleRecordProductImageProcessingFailed(tenantId: string, command: RecordProductImageProcessingFailedCommand): void {
   const { aggregateId, errorMessage, attemptNumber } = command;
 
   // Load existing events
-  const events = loadEvents(aggregateId);
+  const events = loadEvents(tenantId, aggregateId);
   const state = replayEvents(events);
 
   // Validate: Must have started product creation
@@ -207,7 +207,7 @@ export function handleRecordProductImageProcessingFailed(command: RecordProductI
   }
 
   // Insert ProductImageProcessingFailed event
-  insertEvent({
+  insertEvent(tenantId, {
     aggregateId,
     eventType: 'ProductImageProcessingFailed',
     eventData: JSON.stringify({ errorMessage, attemptNumber }),

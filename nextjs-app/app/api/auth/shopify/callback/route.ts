@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyShopifyHmac } from '@/lib/shopify/hmac';
 import { getUserById } from '@/lib/db/system';
-import { saveShopifyConnection } from '@/lib/db/shopify-connection';
+import { saveShopifyConnection, isShopConnectedByOtherTenant } from '@/lib/db/shopify-connection';
 
 function getShopifyClientId(): string {
   return process.env.SHOPIFY_CLIENT_ID || '';
@@ -118,15 +118,29 @@ export async function GET(request: NextRequest) {
       return NextResponse.redirect(new URL('/dashboard?error=oauth_location_fetch', request.url));
     }
 
-    saveShopifyConnection({
-      shop,
-      access_token: tokenData.access_token,
-      scope: tokenData.scope,
-      location_id: String(locationId),
-      connected_by_user_id: userId
-    });
+    // A shop can be actively connected by only one tenant
+    if (isShopConnectedByOtherTenant(shop, user.tenant_id)) {
+      console.error(`Shop ${shop} is already connected by another tenant`);
+      return NextResponse.redirect(new URL('/dashboard?error=oauth_shop_taken', request.url));
+    }
 
-    console.log(`Shopify store ${shop} connected by user ${userId}`);
+    try {
+      saveShopifyConnection(user.tenant_id, {
+        shop,
+        access_token: tokenData.access_token,
+        scope: tokenData.scope,
+        location_id: String(locationId),
+        connected_by_user_id: userId
+      });
+    } catch (error: any) {
+      // Backstop for the partial unique index racing the check above
+      if (error.code === 'SQLITE_CONSTRAINT_UNIQUE') {
+        return NextResponse.redirect(new URL('/dashboard?error=oauth_shop_taken', request.url));
+      }
+      throw error;
+    }
+
+    console.log(`Shopify store ${shop} connected by user ${userId} (tenant ${user.tenant_id})`);
 
     // Clear OAuth cookies and redirect to dashboard
     const response = NextResponse.redirect(new URL('/dashboard?shopify=connected', request.url));

@@ -15,17 +15,18 @@ export async function GET(request: NextRequest) {
 
     // Get query parameters
     const { searchParams } = new URL(request.url);
+    const tenantId = searchParams.get('tenantId');
     const aggregateId = searchParams.get('aggregateId');
 
-    if (!aggregateId) {
+    if (!tenantId || !aggregateId) {
       return NextResponse.json(
-        { error: 'Missing aggregateId' },
+        { error: 'Missing tenantId or aggregateId' },
         { status: 400 }
       );
     }
 
     // Get product details
-    const details = getProductDetailsForShopify(aggregateId);
+    const details = getProductDetailsForShopify(tenantId, aggregateId);
 
     if (!details) {
       return NextResponse.json(

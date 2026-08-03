@@ -17,6 +17,7 @@ const OAUTH_ERROR_MESSAGES: Record<string, string> = {
   oauth_shop_mismatch: 'Shopify authorization failed: shop mismatch. Please try again.',
   oauth_no_user: 'Shopify authorization failed: session expired. Please log in and try again.',
   oauth_not_admin: 'Only an admin can connect the Shopify store.',
+  oauth_shop_taken: 'This Shopify store is already connected to another account.',
   oauth_invalid_hmac: 'Shopify authorization failed: invalid signature.',
   oauth_token_exchange: 'Shopify authorization failed while exchanging the access token.',
   oauth_location_fetch: 'Connected to Shopify but failed to read the store location. Please try again.',

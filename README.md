@@ -94,7 +94,7 @@ npm install
 **nextjs-app/.env**
 ```env
 DATABASE_PATH=./data/system.db
-STORE_DATABASE_PATH=./data/store.db
+TENANT_DATABASES_PATH=./data/tenants
 
 JWT_SECRET=<your-generated-jwt-secret>
 JWT_EXPIRATION=7d
@@ -102,8 +102,8 @@ JWT_EXPIRATION=7d
 # Required - the app refuses all requests if unset
 BACKGROUND_PROCESSOR_API_KEY=<your-generated-api-key>
 
-# From the Dev Dashboard app (see Shopify Setup). Shop domain and inventory
-# location are captured in the UI connect flow, not configured here.
+# From the Dev Dashboard app (see Shopify Setup). Shop domains and inventory
+# locations are captured per tenant in the UI connect flow, not configured here.
 SHOPIFY_CLIENT_ID=<your-app-client-id>
 SHOPIFY_CLIENT_SECRET=<your-app-client-secret>
 SHOPIFY_SCOPES=read_products,write_products,write_files,read_files,read_locations,write_inventory,read_inventory
@@ -120,8 +120,8 @@ NEXTJS_API_KEY=<same-api-key-as-above>
 
 POLLING_INTERVAL_MS=5000
 
-# The offline token, shop domain and location all come from the
-# /api/queries/shopify-connection endpoint - only the API version is env
+# Each tenant's offline token, shop domain and location come from the
+# /api/queries/shopify-connections endpoint - only the API version is env
 SHOPIFY_API_VERSION=2025-10
 
 OPENAI_API_KEY=<your-openai-api-key>
@@ -161,26 +161,36 @@ npm start
 
 ### 6. First Time Setup
 
-1. Navigate to http://localhost:3000
-2. Create your admin account (first user)
+The app is multi-tenant with open self-serve registration: each registration
+creates a new tenant (a store and its staff) with its own event database.
+
+1. Navigate to http://localhost:3000 and click "Register your store"
+2. Register with email + password - you become the admin of a new tenant
 3. On the dashboard, enter your store's `*.myshopify.com` domain and approve
-   the app on Shopify (one-time; the offline token never expires)
-4. You're ready to start creating products! Additional users created by the
-   admin share the same store-wide inventory and are blocked until step 3 is
-   done.
+   the app on Shopify (one-time; the offline token never expires). A store
+   can be actively connected by only one tenant.
+4. Invite your staff from "Manage Users" - they share your tenant's
+   inventory and are blocked until step 3 is done.
+
+Every tenant repeats the same flow independently; the background processor
+serves all tenants from one process.
+
+Dev reset: delete `nextjs-app/data/` (system + tenant databases) and clear
+browser localStorage (old tokens are rejected).
 
 ### Migrating from per-user databases
 
-Deployments that predate the shared store database can merge the old
-`data/users/*.db` event databases into `data/store.db`:
+Deployments that predate tenant databases can merge the old
+`data/users/*.db` event databases into one tenant's database (register the
+tenant first):
 
 ```bash
 cd nextjs-app
-node scripts/migrate-to-store-db.js
+node scripts/migrate-to-tenant-db.js --tenant <tenant-uuid>
 ```
 
-Shopify token events are deliberately not migrated - the admin simply
-re-connects the store from the dashboard.
+Shopify token events are deliberately not migrated - the tenant's admin
+simply re-connects the store from the dashboard.
 
 ## Usage
 

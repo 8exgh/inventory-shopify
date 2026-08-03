@@ -16,6 +16,7 @@ function getJwtExpiration(): string {
 
 export interface JWTPayload {
   userId: string;
+  tenantId: string;
   role: 'admin' | 'restocker';
   exp?: number;
 }

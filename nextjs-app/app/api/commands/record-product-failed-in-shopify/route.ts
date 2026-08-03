@@ -4,6 +4,7 @@ import { requireApiKey } from '@/lib/auth/middleware';
 import { handleRecordProductFailedInShopify } from '@/lib/commands/product-commands';
 
 const RecordProductFailedSchema = z.object({
+  tenantId: z.string().uuid(),
   aggregateId: z.string().uuid(),
   errorMessage: z.string(),
   attemptNumber: z.number().min(1).max(5)
@@ -33,7 +34,7 @@ export async function POST(request: NextRequest) {
     const command = validation.data;
 
     // Handle command
-    handleRecordProductFailedInShopify(command);
+    handleRecordProductFailedInShopify(command.tenantId, command);
 
     return NextResponse.json({ success: true });
   } catch (error: any) {

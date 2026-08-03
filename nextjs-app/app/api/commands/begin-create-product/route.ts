@@ -40,8 +40,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Nothing can be intaken until an admin has connected the store
-    if (!getShopifyConnection()) {
+    // Nothing can be intaken until this tenant's admin has connected the store
+    if (!getShopifyConnection(auth.tenantId!)) {
       return NextResponse.json(
         { error: 'Shopify store is not connected', code: 'SHOPIFY_NOT_CONNECTED' },
         { status: 409 }
@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Handle command
-    handleBeginCreateProduct({ ...validation.data, createdByUserId: auth.userId });
+    handleBeginCreateProduct(auth.tenantId!, { ...validation.data, createdByUserId: auth.userId });
 
     return NextResponse.json({ success: true, aggregateId: validation.data.aggregateId });
   } catch (error: any) {

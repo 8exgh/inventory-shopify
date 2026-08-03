@@ -2,24 +2,34 @@ import Database from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
 import { Event } from '@/types/events';
+import { tenantExists } from './system';
 
-function getStoreDatabasePath(): string {
-  return process.env.STORE_DATABASE_PATH || './data/store.db';
+function getTenantDatabasesPath(): string {
+  return process.env.TENANT_DATABASES_PATH || './data/tenants';
 }
 
-let storeDb: Database.Database | null = null;
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-export function getStoreDb(): Database.Database {
-  if (!storeDb) {
-    const dbPath = getStoreDatabasePath();
-    fs.mkdirSync(path.dirname(dbPath), { recursive: true });
-    storeDb = new Database(dbPath);
-    initializeStoreDb(storeDb);
+// TODO: LRU-close handles if tenant count approaches ~500 (one fd per tenant)
+const tenantDbs: Map<string, Database.Database> = new Map();
+
+export function getTenantDb(tenantId: string): Database.Database {
+  if (!tenantDbs.has(tenantId)) {
+    // tenantId can arrive from API-key request params: reject anything that
+    // isn't a known tenant before it touches the filesystem.
+    if (!UUID_PATTERN.test(tenantId) || !tenantExists(tenantId)) {
+      throw new Error('Unknown tenant');
+    }
+    const dir = getTenantDatabasesPath();
+    fs.mkdirSync(dir, { recursive: true });
+    const db = new Database(path.join(dir, `${tenantId}.db`));
+    initializeTenantDb(db);
+    tenantDbs.set(tenantId, db);
   }
-  return storeDb;
+  return tenantDbs.get(tenantId)!;
 }
 
-function initializeStoreDb(db: Database.Database): void {
+function initializeTenantDb(db: Database.Database): void {
   db.exec(`
     CREATE TABLE IF NOT EXISTS events (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -46,8 +56,8 @@ export interface InsertEventParams {
   version: number;
 }
 
-export function insertEvent(params: InsertEventParams): void {
-  const db = getStoreDb();
+export function insertEvent(tenantId: string, params: InsertEventParams): void {
+  const db = getTenantDb(tenantId);
   db.prepare(`
     INSERT INTO events (aggregate_id, event_type, event_data, photo_blob, timestamp, version)
     VALUES (?, ?, ?, ?, ?, ?)
@@ -61,22 +71,23 @@ export function insertEvent(params: InsertEventParams): void {
   );
 }
 
-export function loadEvents(aggregateId: string): Event[] {
-  const db = getStoreDb();
+export function loadEvents(tenantId: string, aggregateId: string): Event[] {
+  const db = getTenantDb(tenantId);
   return db.prepare('SELECT * FROM events WHERE aggregate_id = ? ORDER BY version ASC')
     .all(aggregateId) as Event[];
 }
 
-export function loadAllEvents(): Event[] {
-  const db = getStoreDb();
+export function loadAllEvents(tenantId: string): Event[] {
+  const db = getTenantDb(tenantId);
   return db.prepare('SELECT * FROM events ORDER BY timestamp ASC').all() as Event[];
 }
 
 export function getPhotoBlob(
+  tenantId: string,
   aggregateId: string,
   eventType: string = 'BeginProductCreated'
 ): Buffer | null {
-  const db = getStoreDb();
+  const db = getTenantDb(tenantId);
   // Ordered so that if a retry ever writes a second blob-carrying event
   // (e.g. ProductImageProcessed), the most recent one wins.
   const result = db.prepare(`

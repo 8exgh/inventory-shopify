@@ -13,8 +13,12 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    if (!auth.tenantId) {
+      return NextResponse.json({ shopUrl: '' });
+    }
+
     // Empty until the store is connected; the Header renders nothing then
-    const connection = getShopifyConnection();
+    const connection = getShopifyConnection(auth.tenantId);
     const shopUrl = connection ? `https://${connection.shop}` : '';
     return NextResponse.json({ shopUrl });
   } catch (error: any) {

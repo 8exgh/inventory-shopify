@@ -1,5 +1,6 @@
 import dotenv from 'dotenv';
-import { getShopifyConnection } from './utils/api-client.js';
+import { getShopifyConnections } from './utils/api-client.js';
+import { buildConnectionMap, reportReconnected } from './utils/connection-registry.js';
 import { runColorEstimationJob } from './jobs/color-estimation.js';
 import { runImageProcessingJob } from './jobs/image-processing.js';
 import { runShopifyCreationJob } from './jobs/shopify-creation.js';
@@ -22,37 +23,22 @@ async function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-// Latched so quiet cycles don't repeat the same line forever
-let warnedNotConnected = false;
-
 async function runJobLoop(): Promise<void> {
   while (true) {
     try {
       console.log(`\n[${new Date().toISOString()}] Running job cycle...`);
 
-      // The offline store token is fetched once per cycle and shared by the
-      // Shopify-dependent jobs.
-      const connection = await getShopifyConnection();
+      // All tenants' offline tokens, fetched once per cycle and shared by
+      // the Shopify-dependent jobs.
+      const connections = buildConnectionMap(await getShopifyConnections());
+      reportReconnected(connections);
 
-      if (!connection) {
-        if (!warnedNotConnected) {
-          console.log('[Job Loop] Shopify store not connected; skipping Shopify jobs until an admin connects it');
-          warnedNotConnected = true;
-        }
-      } else {
-        if (warnedNotConnected) {
-          console.log(`[Job Loop] Shopify store connected (${connection.shop}); resuming Shopify jobs`);
-          warnedNotConnected = false;
-        }
-        await runColorEstimationJob(connection);
-      }
+      await runColorEstimationJob(connections);
 
-      // Image processing has no Shopify dependency — always runs
+      // Image processing has no Shopify dependency — runs for every tenant
       await runImageProcessingJob();
 
-      if (connection) {
-        await runShopifyCreationJob(connection);
-      }
+      await runShopifyCreationJob(connections);
 
       console.log(`[${new Date().toISOString()}] Job cycle complete`);
     } catch (error: any) {

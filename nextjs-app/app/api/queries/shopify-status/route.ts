@@ -22,7 +22,14 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const connection = getShopifyConnection();
+    if (!auth.tenantId) {
+      return NextResponse.json(
+        { error: 'This query requires a user session' },
+        { status: 403 }
+      );
+    }
+
+    const connection = getShopifyConnection(auth.tenantId);
 
     if (!connection) {
       return NextResponse.json({ connected: false });

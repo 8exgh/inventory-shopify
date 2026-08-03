@@ -12,6 +12,7 @@ function getBackgroundProcessorApiKey(): string {
 export interface AuthResult {
   authenticated: boolean;
   userId?: string;
+  tenantId?: string;
   role?: 'admin' | 'restocker';
   isApiKey?: boolean;
   error?: string;
@@ -33,13 +34,15 @@ export function authenticateRequest(request: NextRequest): AuthResult {
   const token = authHeader.substring(7);
   const payload = verifyToken(token);
 
-  if (!payload) {
+  // Tokens minted before multi-tenancy lack tenantId and are invalid
+  if (!payload || !payload.userId || !payload.tenantId) {
     return { authenticated: false, error: 'Invalid token' };
   }
 
   return {
     authenticated: true,
     userId: payload.userId,
+    tenantId: payload.tenantId,
     role: payload.role,
     isApiKey: false
   };

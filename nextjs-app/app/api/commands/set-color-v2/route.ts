@@ -4,6 +4,7 @@ import { requireAuth } from '@/lib/auth/middleware';
 import { handleSetColorV2 } from '@/lib/commands/product-commands';
 
 const SetColorV2Schema = z.object({
+  tenantId: z.string().uuid().optional(), // required for API-key callers
   aggregateId: z.string().uuid(),
   colorName: z.string()
 });
@@ -31,8 +32,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // JWT callers are scoped to their tenant; the processor supplies it
+    const tenantId = auth.isApiKey ? command.tenantId : auth.tenantId;
+    if (!tenantId) {
+      return NextResponse.json(
+        { error: 'Missing tenantId' },
+        { status: 400 }
+      );
+    }
+
     // Handle command
-    handleSetColorV2(command);
+    handleSetColorV2(tenantId, command);
 
     return NextResponse.json({ success: true });
   } catch (error: any) {

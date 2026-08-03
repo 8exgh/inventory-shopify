@@ -13,8 +13,14 @@ if (!fs.existsSync(dataDir)) {
   fs.mkdirSync(dataDir, { recursive: true });
 }
 
+export interface Tenant {
+  id: string;
+  created_at: number;
+}
+
 export interface User {
   id: string;
+  tenant_id: string;
   email: string;
   password_hash: string;
   role: 'admin' | 'restocker';
@@ -34,18 +40,25 @@ export function getSystemDb(): Database.Database {
 
 function initializeSystemDb(db: Database.Database): void {
   db.exec(`
+    CREATE TABLE IF NOT EXISTS tenants (
+      id TEXT PRIMARY KEY,
+      created_at INTEGER NOT NULL
+    );
+
     CREATE TABLE IF NOT EXISTS users (
       id TEXT PRIMARY KEY,
+      tenant_id TEXT NOT NULL,
       email TEXT UNIQUE NOT NULL,
       password_hash TEXT NOT NULL,
       role TEXT NOT NULL CHECK(role IN ('admin', 'restocker')),
       must_change_password INTEGER NOT NULL DEFAULT 0,
-      created_at INTEGER NOT NULL,
-      UNIQUE(email)
+      created_at INTEGER NOT NULL
     );
 
-    CREATE TABLE IF NOT EXISTS shopify_connection (
-      id INTEGER PRIMARY KEY CHECK (id = 1),
+    CREATE INDEX IF NOT EXISTS idx_users_tenant ON users(tenant_id);
+
+    CREATE TABLE IF NOT EXISTS shopify_connections (
+      tenant_id TEXT PRIMARY KEY,
       shop TEXT NOT NULL,
       access_token TEXT NOT NULL,
       scope TEXT NOT NULL,
@@ -54,6 +67,9 @@ function initializeSystemDb(db: Database.Database): void {
       connected_at INTEGER NOT NULL,
       status TEXT NOT NULL DEFAULT 'connected' CHECK (status IN ('connected', 'disconnected'))
     );
+
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_connections_shop_active
+      ON shopify_connections(shop) WHERE status = 'connected';
   `);
 }
 
@@ -72,9 +88,29 @@ export function createUser(user: Omit<User, 'created_at'> & { created_at?: numbe
   const created_at = user.created_at || Date.now();
 
   db.prepare(`
-    INSERT INTO users (id, email, password_hash, role, must_change_password, created_at)
-    VALUES (?, ?, ?, ?, ?, ?)
-  `).run(user.id, user.email, user.password_hash, user.role, user.must_change_password, created_at);
+    INSERT INTO users (id, tenant_id, email, password_hash, role, must_change_password, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `).run(user.id, user.tenant_id, user.email, user.password_hash, user.role, user.must_change_password, created_at);
+}
+
+// Registration creates the tenant and its admin atomically. The password must
+// be hashed by the caller first: better-sqlite3 transactions are synchronous.
+export function createTenantWithAdmin(params: {
+  tenantId: string;
+  userId: string;
+  email: string;
+  passwordHash: string;
+}): void {
+  const db = getSystemDb();
+  const now = Date.now();
+  db.transaction(() => {
+    db.prepare('INSERT INTO tenants (id, created_at) VALUES (?, ?)')
+      .run(params.tenantId, now);
+    db.prepare(`
+      INSERT INTO users (id, tenant_id, email, password_hash, role, must_change_password, created_at)
+      VALUES (?, ?, ?, ?, 'admin', 0, ?)
+    `).run(params.userId, params.tenantId, params.email, params.passwordHash, now);
+  })();
 }
 
 export function updateUserPassword(userId: string, newPasswordHash: string, mustChangePassword: number = 0): void {
@@ -83,13 +119,18 @@ export function updateUserPassword(userId: string, newPasswordHash: string, must
     .run(newPasswordHash, mustChangePassword, userId);
 }
 
-export function hasAnyUsers(): boolean {
+export function getTenantIds(): string[] {
   const db = getSystemDb();
-  const result = db.prepare('SELECT COUNT(*) as count FROM users').get() as { count: number };
-  return result.count > 0;
+  const rows = db.prepare('SELECT id FROM tenants').all() as Array<{ id: string }>;
+  return rows.map(r => r.id);
 }
 
-export function getAllUsers(): User[] {
+export function tenantExists(id: string): boolean {
   const db = getSystemDb();
-  return db.prepare('SELECT * FROM users').all() as User[];
+  return db.prepare('SELECT 1 FROM tenants WHERE id = ?').get(id) !== undefined;
+}
+
+export function getUsersByTenant(tenantId: string): User[] {
+  const db = getSystemDb();
+  return db.prepare('SELECT * FROM users WHERE tenant_id = ?').all(tenantId) as User[];
 }

@@ -24,8 +24,17 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // JWT callers are scoped to their tenant; the processor supplies it
+    const tenantId = auth.isApiKey ? searchParams.get('tenantId') : auth.tenantId;
+    if (!tenantId) {
+      return NextResponse.json(
+        { error: 'Missing tenantId' },
+        { status: 400 }
+      );
+    }
+
     // Get product state
-    const state = getProductState(aggregateId);
+    const state = getProductState(tenantId, aggregateId);
 
     if (!state) {
       return NextResponse.json(

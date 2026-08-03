@@ -4,6 +4,7 @@ import { requireApiKey } from '@/lib/auth/middleware';
 import { handleRecordProductCreatedInShopify } from '@/lib/commands/product-commands';
 
 const RecordProductCreatedSchema = z.object({
+  tenantId: z.string().uuid(),
   aggregateId: z.string().uuid(),
   shopifyVariantId: z.string(),
   createdAt: z.number()
@@ -33,7 +34,7 @@ export async function POST(request: NextRequest) {
     const command = validation.data;
 
     // Handle command
-    handleRecordProductCreatedInShopify(command);
+    handleRecordProductCreatedInShopify(command.tenantId, command);
 
     return NextResponse.json({ success: true });
   } catch (error: any) {

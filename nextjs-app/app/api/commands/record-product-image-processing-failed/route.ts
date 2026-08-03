@@ -4,6 +4,7 @@ import { requireApiKey } from '@/lib/auth/middleware';
 import { handleRecordProductImageProcessingFailed } from '@/lib/commands/product-commands';
 
 const RecordProductImageProcessingFailedSchema = z.object({
+  tenantId: z.string().uuid(),
   aggregateId: z.string().uuid(),
   errorMessage: z.string(),
   attemptNumber: z.number().int().positive()
@@ -33,7 +34,7 @@ export async function POST(request: NextRequest) {
     const command = validation.data;
 
     // Handle command
-    handleRecordProductImageProcessingFailed(command);
+    handleRecordProductImageProcessingFailed(command.tenantId, command);
 
     return NextResponse.json({ success: true });
   } catch (error: any) {

@@ -1,10 +1,12 @@
 #!/usr/bin/env node
 /**
  * One-shot migration: merges the legacy per-user event databases
- * (USER_DATABASES_PATH/<userId>.db) into the single shared store database
- * (STORE_DATABASE_PATH).
+ * (USER_DATABASES_PATH/<userId>.db) into one tenant's event database
+ * (TENANT_DATABASES_PATH/<tenantId>.db).
  *
- *   node scripts/migrate-to-store-db.js
+ *   node scripts/migrate-to-tenant-db.js --tenant <tenant-uuid>
+ *
+ * The tenant must already exist in the system database (register first).
  *
  * - Skips Shopify token events entirely (they contain secrets and the event
  *   type no longer exists); the admin re-connects the store instead.
@@ -21,7 +23,18 @@ const fs = require('fs');
 const path = require('path');
 
 const USER_DATABASES_PATH = process.env.USER_DATABASES_PATH || './data/users';
-const STORE_DATABASE_PATH = process.env.STORE_DATABASE_PATH || './data/store.db';
+const TENANT_DATABASES_PATH = process.env.TENANT_DATABASES_PATH || './data/tenants';
+const SYSTEM_DATABASE_PATH = process.env.DATABASE_PATH || './data/system.db';
+
+function parseTenantArg() {
+  const idx = process.argv.indexOf('--tenant');
+  const tenantId = idx !== -1 ? process.argv[idx + 1] : null;
+  if (!tenantId) {
+    console.error('Usage: node scripts/migrate-to-tenant-db.js --tenant <tenant-uuid>');
+    process.exit(1);
+  }
+  return tenantId;
+}
 
 const EVENTS_DDL = `
   CREATE TABLE IF NOT EXISTS events (
@@ -39,6 +52,22 @@ const EVENTS_DDL = `
 `;
 
 function main() {
+  const tenantId = parseTenantArg();
+
+  if (!fs.existsSync(SYSTEM_DATABASE_PATH)) {
+    console.error(`No system database at ${SYSTEM_DATABASE_PATH}; register the tenant first.`);
+    process.exit(1);
+  }
+  const systemDb = new Database(SYSTEM_DATABASE_PATH, { readonly: true });
+  const tenantRow = systemDb.prepare('SELECT 1 FROM tenants WHERE id = ?').get(tenantId);
+  systemDb.close();
+  if (!tenantRow) {
+    console.error(`Tenant ${tenantId} does not exist in the system database; register it first.`);
+    process.exit(1);
+  }
+
+  const STORE_DATABASE_PATH = path.join(TENANT_DATABASES_PATH, `${tenantId}.db`);
+
   if (!fs.existsSync(USER_DATABASES_PATH)) {
     console.log(`No user databases directory at ${USER_DATABASES_PATH}; nothing to migrate.`);
     return;
@@ -57,7 +86,7 @@ function main() {
   const existing = storeDb.prepare('SELECT COUNT(*) AS count FROM events').get();
   if (existing.count > 0) {
     console.error(
-      `Store database ${STORE_DATABASE_PATH} already contains ${existing.count} events. ` +
+      `Tenant database ${STORE_DATABASE_PATH} already contains ${existing.count} events. ` +
       'Aborting; delete it first to re-run the migration.'
     );
     process.exit(1);

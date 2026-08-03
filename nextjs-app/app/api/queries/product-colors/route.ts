@@ -25,8 +25,15 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Get the store-level connection
-    const connection = getShopifyConnection();
+    if (!auth.tenantId) {
+      return NextResponse.json(
+        { error: 'This query requires a user session' },
+        { status: 403 }
+      );
+    }
+
+    // Get the tenant's store connection
+    const connection = getShopifyConnection(auth.tenantId);
     if (!connection) {
       return NextResponse.json(
         { error: 'Shopify not connected', code: 'SHOPIFY_NOT_CONNECTED' },

@@ -4,6 +4,7 @@ import { requireApiKey } from '@/lib/auth/middleware';
 import { handleSetEstimatedColor } from '@/lib/commands/product-commands';
 
 const SetEstimatedColorSchema = z.object({
+  tenantId: z.string().uuid(),
   aggregateId: z.string().uuid(),
   color: z.object({
     r: z.number().min(0).max(255),
@@ -36,7 +37,7 @@ export async function POST(request: NextRequest) {
     const command = validation.data;
 
     // Handle command
-    handleSetEstimatedColor(command);
+    handleSetEstimatedColor(command.tenantId, command);
 
     return NextResponse.json({ success: true });
   } catch (error: any) {

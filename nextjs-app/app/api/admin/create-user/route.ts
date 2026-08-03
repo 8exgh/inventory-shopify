@@ -22,6 +22,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // API keys pass requireAdmin but carry no tenant; user management is
+    // strictly a human-admin operation
+    if (!auth.tenantId) {
+      return NextResponse.json(
+        { error: 'This operation requires an admin session' },
+        { status: 403 }
+      );
+    }
+
     const body = await request.json();
     const validation = CreateUserSchema.safeParse(body);
 
@@ -55,10 +64,11 @@ export async function POST(request: NextRequest) {
     // Hash password
     const password_hash = await hashPassword(password);
 
-    // Create user (must change password on first login)
+    // Create user in the admin's tenant (must change password on first login)
     const userId = uuidv4();
     createUser({
       id: userId,
+      tenant_id: auth.tenantId,
       email,
       password_hash,
       role,

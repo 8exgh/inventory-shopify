@@ -1,15 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireApiKey } from '@/lib/auth/middleware';
-import { getShopifyConnection } from '@/lib/db/shopify-connection';
+import { getConnectedShopifyConnections } from '@/lib/db/shopify-connection';
 
 /**
- * GET /api/queries/shopify-connection
+ * GET /api/queries/shopify-connections
  *
- * Returns the store-level offline Shopify credentials for the background
+ * Returns every tenant's offline Shopify credentials for the background
  * processor. Auth: API key only.
  *
  * Returns:
- * - { connection: { accessToken, shop, locationId } | null }
+ * - { connections: [{ tenantId, accessToken, shop, locationId }] }
  */
 export async function GET(request: NextRequest) {
   try {
@@ -22,21 +22,16 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const connection = getShopifyConnection();
+    const connections = getConnectedShopifyConnections().map(connection => ({
+      tenantId: connection.tenant_id,
+      accessToken: connection.access_token,
+      shop: connection.shop,
+      locationId: connection.location_id
+    }));
 
-    if (!connection) {
-      return NextResponse.json({ connection: null });
-    }
-
-    return NextResponse.json({
-      connection: {
-        accessToken: connection.access_token,
-        shop: connection.shop,
-        locationId: connection.location_id
-      }
-    });
+    return NextResponse.json({ connections });
   } catch (error: any) {
-    console.error('Get Shopify connection error:', error);
+    console.error('Get Shopify connections error:', error);
     return NextResponse.json(
       { error: error.message || 'Internal server error' },
       { status: 500 }
