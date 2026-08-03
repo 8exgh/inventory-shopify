@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth/middleware';
 import { createShopifyClient } from '@/lib/shopify/client';
-import { getLatestShopifyToken } from '@/lib/queries/shopify-token-queries';
+import { getShopifyConnection } from '@/lib/db/shopify-connection';
 
 export async function GET(request: NextRequest) {
   try {
     // Authenticate
     const auth = requireAuth(request);
-    if (!auth.authenticated || !auth.userId) {
+    if (!auth.authenticated) {
       return NextResponse.json(
         { error: auth.error || 'Unauthorized' },
         { status: 401 }
@@ -25,17 +25,16 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Get user's Shopify token
-    const token = getLatestShopifyToken(auth.userId);
-    if (!token) {
+    // Get the store-level connection
+    const connection = getShopifyConnection();
+    if (!connection) {
       return NextResponse.json(
         { error: 'Shopify not connected', code: 'SHOPIFY_NOT_CONNECTED' },
-        { status: 401 }
+        { status: 409 }
       );
     }
 
-    // Create client with user's token
-    const shopifyClient = createShopifyClient(token.accessToken, token.shop);
+    const shopifyClient = createShopifyClient(connection.access_token, connection.shop);
 
     // Get available colors for this product
     const colors = await shopifyClient.getProductColors(productId);

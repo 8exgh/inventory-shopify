@@ -3,7 +3,6 @@ import { createVariant, makeDiscDescriptorUnique, parseGrams, buildSku } from '.
 
 // Mock environment variables
 process.env.SHOPIFY_API_VERSION = '2025-10';
-process.env.SHOPIFY_LOCATION_ID = '12345678';
 
 
 describe('createVariant', () => {
@@ -39,7 +38,8 @@ describe('createVariant', () => {
         imageId: '98765'
       },
       'shpca_test_token',
-      'test-store.myshopify.com'
+      'test-store.myshopify.com',
+      '12345678'
     );
 
     // Assert
@@ -68,6 +68,14 @@ describe('createVariant', () => {
       })
     );
 
+    // The inventory call uses the location passed in, not any env var
+    const inventoryBody = JSON.parse((global.fetch as any).mock.calls[1][1].body);
+    expect(inventoryBody).toEqual({
+      location_id: '12345678',
+      inventory_item_id: '1122334455',
+      available: 1
+    });
+
     expect(result).toBe('67890');
   });
 
@@ -88,7 +96,8 @@ describe('createVariant', () => {
         imageId: '98765'
       },
       'shpca_test_token',
-      'test-store.myshopify.com'
+      'test-store.myshopify.com',
+      '12345678'
     );
 
     const body = JSON.parse((global.fetch as any).mock.calls[0][1].body);

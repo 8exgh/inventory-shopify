@@ -4,7 +4,6 @@ import { requireApiKey } from '@/lib/auth/middleware';
 import { handleRecordProductCreatedInShopify } from '@/lib/commands/product-commands';
 
 const RecordProductCreatedSchema = z.object({
-  userId: z.string().uuid(),
   aggregateId: z.string().uuid(),
   shopifyVariantId: z.string(),
   createdAt: z.number()

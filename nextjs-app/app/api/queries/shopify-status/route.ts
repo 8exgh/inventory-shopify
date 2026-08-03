@@ -1,31 +1,34 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth/middleware';
-import { getShopifyConnectionStatus } from '@/lib/queries/shopify-token-queries';
+import { getShopifyConnection } from '@/lib/db/shopify-connection';
 
 /**
  * GET /api/queries/shopify-status
  *
- * Returns the Shopify connection status for the authenticated user.
+ * Returns the store-wide Shopify connection status.
  * Auth: JWT (user must be logged in).
  *
  * Returns:
- * - { connected: boolean, shop?: string, expiresAt?: number }
+ * - { connected: boolean, shop?: string }
  */
 export async function GET(request: NextRequest) {
   try {
     // Require JWT authentication
     const auth = requireAuth(request);
-    if (!auth.authenticated || !auth.userId) {
+    if (!auth.authenticated) {
       return NextResponse.json(
         { error: auth.error || 'Unauthorized' },
         { status: 401 }
       );
     }
 
-    // Get connection status for this user
-    const status = getShopifyConnectionStatus(auth.userId);
+    const connection = getShopifyConnection();
 
-    return NextResponse.json(status);
+    if (!connection) {
+      return NextResponse.json({ connected: false });
+    }
+
+    return NextResponse.json({ connected: true, shop: connection.shop });
   } catch (error: any) {
     console.error('Get Shopify status error:', error);
     return NextResponse.json(

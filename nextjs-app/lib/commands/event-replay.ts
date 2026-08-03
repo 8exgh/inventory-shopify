@@ -13,7 +13,8 @@ export function replayEvents(events: Event[]): ProductState {
           status: 'data-entry',
           shopifyProductId: eventData.shopifyProductId,
           shopifyProductTitle: eventData.shopifyProductTitle,
-          photoMimeType: eventData.photoMimeType
+          photoMimeType: eventData.photoMimeType,
+          createdByUserId: eventData.createdByUserId
         };
         break;
 

@@ -2,8 +2,11 @@ import { NextRequest } from 'next/server';
 import { verifyToken, JWTPayload } from './jwt';
 
 function getBackgroundProcessorApiKey(): string {
-  const BACKGROUND_PROCESSOR_API_KEY = process.env.BACKGROUND_PROCESSOR_API_KEY || 'TODO';
-  return BACKGROUND_PROCESSOR_API_KEY;
+  const key = process.env.BACKGROUND_PROCESSOR_API_KEY;
+  if (!key) {
+    throw new Error('BACKGROUND_PROCESSOR_API_KEY environment variable must be set');
+  }
+  return key;
 }
 
 export interface AuthResult {
@@ -74,21 +77,4 @@ export function requireApiKey(request: NextRequest): AuthResult {
   }
 
   return { authenticated: true, isApiKey: true };
-}
-
-export function requireUserOrApiKey(request: NextRequest, userId: string): AuthResult {
-  const auth = authenticateRequest(request);
-  if (!auth.authenticated) {
-    return auth;
-  }
-
-  if (auth.isApiKey) {
-    return auth; // API key has access to all users
-  }
-
-  if (auth.userId !== userId) {
-    return { authenticated: false, error: 'Access denied to this user data' };
-  }
-
-  return auth;
 }

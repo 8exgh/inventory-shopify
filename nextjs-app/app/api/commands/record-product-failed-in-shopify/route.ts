@@ -4,7 +4,6 @@ import { requireApiKey } from '@/lib/auth/middleware';
 import { handleRecordProductFailedInShopify } from '@/lib/commands/product-commands';
 
 const RecordProductFailedSchema = z.object({
-  userId: z.string().uuid(),
   aggregateId: z.string().uuid(),
   errorMessage: z.string(),
   attemptNumber: z.number().min(1).max(5)

@@ -61,10 +61,9 @@ export default function ProductDetail() {
   async function loadProductImage(variant: 'original' | 'processed') {
     try {
       const token = localStorage.getItem('token');
-      const userId = localStorage.getItem('userId');
 
       const response = await fetch(
-        `/api/queries/product-image?userId=${userId}&aggregateId=${aggregateId}&variant=${variant}`,
+        `/api/queries/product-image?aggregateId=${aggregateId}&variant=${variant}`,
         { headers: { 'Authorization': `Bearer ${token}` } }
       );
 
@@ -94,10 +93,9 @@ export default function ProductDetail() {
   async function loadProductState() {
     try {
       const token = localStorage.getItem('token');
-      const userId = localStorage.getItem('userId');
 
       const response = await fetch(
-        `/api/queries/product-state?userId=${userId}&aggregateId=${aggregateId}`,
+        `/api/queries/product-state?aggregateId=${aggregateId}`,
         { headers: { 'Authorization': `Bearer ${token}` } }
       );
 
@@ -113,10 +111,9 @@ export default function ProductDetail() {
   async function loadProductWeights(shopifyProductId: string) {
     try {
       const token = localStorage.getItem('token');
-      const userId = localStorage.getItem('userId');
 
       const response = await fetch(
-        `/api/queries/product-weights?userId=${userId}&shopifyProductId=${shopifyProductId}`,
+        `/api/queries/product-weights?shopifyProductId=${shopifyProductId}`,
         { headers: { 'Authorization': `Bearer ${token}` } }
       );
 
@@ -133,7 +130,6 @@ export default function ProductDetail() {
     // Update color via SetColorV2 command
     try {
       const token = localStorage.getItem('token');
-      const userId = localStorage.getItem('userId');
 
       await fetch('/api/commands/set-color-v2', {
         method: 'POST',
@@ -142,7 +138,6 @@ export default function ProductDetail() {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          userId,
           aggregateId,
           colorName: newColor
         })
@@ -168,7 +163,6 @@ export default function ProductDetail() {
 
     try {
       const token = localStorage.getItem('token');
-      const userId = localStorage.getItem('userId');
 
       const response = await fetch('/api/commands/finish-create-product', {
         method: 'POST',
@@ -177,7 +171,6 @@ export default function ProductDetail() {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          userId,
           aggregateId,
           weight
         })

@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { requireUserOrApiKey } from '@/lib/auth/middleware';
+import { requireAuth } from '@/lib/auth/middleware';
+import { getShopifyConnection } from '@/lib/db/shopify-connection';
 import { handleBeginCreateProduct } from '@/lib/commands/product-commands';
 
 const BeginCreateProductSchema = z.object({
-  userId: z.string().uuid(),
   aggregateId: z.string().uuid(),
   shopifyProductId: z.string(),
   shopifyProductTitle: z.string(),
@@ -24,10 +24,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const command = validation.data;
-
-    // Authenticate (user can only create their own products, or API key)
-    const auth = requireUserOrApiKey(request, command.userId);
+    const auth = requireAuth(request);
     if (!auth.authenticated) {
       return NextResponse.json(
         { error: auth.error || 'Unauthorized' },
@@ -35,10 +32,26 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Handle command
-    handleBeginCreateProduct(command);
+    // Discs are attributed to the human who photographed them
+    if (auth.isApiKey || !auth.userId) {
+      return NextResponse.json(
+        { error: 'This command requires a user session' },
+        { status: 403 }
+      );
+    }
 
-    return NextResponse.json({ success: true, aggregateId: command.aggregateId });
+    // Nothing can be intaken until an admin has connected the store
+    if (!getShopifyConnection()) {
+      return NextResponse.json(
+        { error: 'Shopify store is not connected', code: 'SHOPIFY_NOT_CONNECTED' },
+        { status: 409 }
+      );
+    }
+
+    // Handle command
+    handleBeginCreateProduct({ ...validation.data, createdByUserId: auth.userId });
+
+    return NextResponse.json({ success: true, aggregateId: validation.data.aggregateId });
   } catch (error: any) {
     console.error('Begin create product error:', error);
 

@@ -4,17 +4,12 @@ import {
     getProductDetailsForShopify,
     recordProductCreated,
     recordProductFailed,
-    getShopifyToken
+    ShopifyConnection
 } from '../utils/api-client.js';
 
 function getShopifyApiVersion(): string {
     const SHOPIFY_API_VERSION = process.env.SHOPIFY_API_VERSION || '2025-10';
     return SHOPIFY_API_VERSION;
-}
-
-function getShopifyLocationId(): string {
-    const SHOPIFY_LOCATION_ID = process.env.SHOPIFY_LOCATION_ID || '';
-    return SHOPIFY_LOCATION_ID;
 }
 
 async function getProduct(
@@ -74,14 +69,9 @@ async function setInventoryLevel(
     inventoryItemId: string,
     quantity: number,
     accessToken: string,
-    shop: string
+    shop: string,
+    locationId: string
 ): Promise<void> {
-    const locationId = getShopifyLocationId();
-
-    if (!locationId) {
-        throw new Error('SHOPIFY_LOCATION_ID environment variable not set');
-    }
-
     const response = await fetch(
         `https://${shop}/admin/api/${getShopifyApiVersion()}/inventory_levels/set.json`,
         {
@@ -119,7 +109,8 @@ export async function createVariant(
     productId: string,
     spec: NewVariantSpec,
     accessToken: string,
-    shop: string
+    shop: string,
+    locationId: string
 ): Promise<string> {
     const variant: Record<string, unknown> = {
         option1: spec.option1,
@@ -167,7 +158,7 @@ export async function createVariant(
     const inventoryItemId = data.variant.inventory_item_id.toString();
 
     // Step 2: Set inventory quantity to 1
-    await setInventoryLevel(inventoryItemId, 1, accessToken, shop);
+    await setInventoryLevel(inventoryItemId, 1, accessToken, shop, locationId);
 
     return variantId;
 }
@@ -231,7 +222,7 @@ export function buildSku(
     return sku;
 }
 
-export async function runShopifyCreationJob(): Promise<void> {
+export async function runShopifyCreationJob(connection: ShopifyConnection): Promise<void> {
     try {
         const tasks = await getProductsToCreateInShopify();
 
@@ -241,23 +232,16 @@ export async function runShopifyCreationJob(): Promise<void> {
 
         console.log(`[Shopify Creation] Found ${tasks.length} products to create`);
 
+        const { accessToken, shop, locationId } = connection;
+
         for (const task of tasks) {
             let attemptNumber = 1; // TODO: Get actual attempt count
 
             try {
                 console.log(`[Shopify Creation] Processing ${task.aggregateId}...`);
 
-                // Get user's Shopify token
-                const tokenResult = await getShopifyToken(task.userId);
-                if (!tokenResult) {
-                    console.warn(`[Shopify Creation] No valid Shopify token for user ${task.userId}, skipping ${task.aggregateId}`);
-                    continue;
-                }
-
-                const { accessToken, shop } = tokenResult;
-
                 // Get product details
-                const details = await getProductDetailsForShopify(task.userId, task.aggregateId);
+                const details = await getProductDetailsForShopify(task.aggregateId);
                 console.log(`[Shopify Creation] Details:`, details);
 
                 // Use the color that was already matched in color-estimation job
@@ -270,7 +254,7 @@ export async function runShopifyCreationJob(): Promise<void> {
                 // Get the centered image on the light blue canvas. The work
                 // query guarantees ProductImageProcessed exists before a
                 // product reaches this job.
-                const imageBuffer = await getProductImage(task.userId, task.aggregateId, 'processed');
+                const imageBuffer = await getProductImage(task.aggregateId, 'processed');
                 const imageBase64 = imageBuffer.toString('base64');
 
                 // Fetch the full product: options tell us where the per-disc
@@ -325,19 +309,20 @@ export async function runShopifyCreationJob(): Promise<void> {
                         imageId
                     },
                     accessToken,
-                    shop
+                    shop,
+                    locationId
                 );
                 console.log(`[Shopify Creation] Created variant: ${variantId}`);
 
                 // Record success
-                await recordProductCreated(task.userId, task.aggregateId, variantId);
+                await recordProductCreated(task.aggregateId, variantId);
                 console.log(`[Shopify Creation] Success for ${task.aggregateId}`);
             } catch (error: any) {
                 console.error(`[Shopify Creation] Error processing ${task.aggregateId}:`, error.message);
 
                 // Record failure
                 try {
-                    await recordProductFailed(task.userId, task.aggregateId, error.message, attemptNumber);
+                    await recordProductFailed(task.aggregateId, error.message, attemptNumber);
                 } catch (recordError: any) {
                     console.error(`[Shopify Creation] Failed to record error:`, recordError.message);
                 }

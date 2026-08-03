@@ -31,12 +31,12 @@ export async function runImageProcessingJob(): Promise<void> {
             try {
                 console.log(`[Image Processing] Processing ${task.aggregateId}...`);
 
-                const state = await getProductState(task.userId, task.aggregateId);
+                const state = await getProductState(task.aggregateId);
                 attemptNumber = (state.imageProcessingFailureCount || 0) + 1;
 
                 // Always read the original photo: the color estimation job
                 // depends on it staying untouched.
-                const imageBuffer = await getProductImage(task.userId, task.aggregateId);
+                const imageBuffer = await getProductImage(task.aggregateId);
 
                 const editedBuffer = await callOpenAiEdit(imageBuffer);
                 console.log(`[Image Processing] Received edited image for ${task.aggregateId}`);
@@ -45,7 +45,6 @@ export async function runImageProcessingJob(): Promise<void> {
                 console.log(`[Image Processing] Normalized to ${getCanvasSize()}x${getCanvasSize()} on ${getBackgroundHex()}`);
 
                 await recordProductImageProcessed(
-                    task.userId,
                     task.aggregateId,
                     processedBuffer.toString('base64'),
                     'image/png',
@@ -62,7 +61,6 @@ export async function runImageProcessingJob(): Promise<void> {
                 // in getProductsNeedingImageProcessing can actually take effect.
                 try {
                     await recordProductImageProcessingFailed(
-                        task.userId,
                         task.aggregateId,
                         error.message,
                         attemptNumber

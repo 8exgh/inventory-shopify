@@ -11,7 +11,6 @@ function getApiKey(): string {
 }
 
 export interface ProductTask {
-  userId: string;
   aggregateId: string;
 }
 
@@ -41,6 +40,25 @@ export interface ShopifyProduct {
   }>;
 }
 
+export interface ShopifyConnection {
+  accessToken: string;
+  shop: string;
+  locationId: string;
+}
+
+export async function getShopifyConnection(): Promise<ShopifyConnection | null> {
+  const response = await fetch(`${getApiUrl()}/api/queries/shopify-connection`, {
+    headers: { 'X-API-Key': getApiKey() },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to get Shopify connection: ${response.statusText}`);
+  }
+
+  const data = await response.json() as { connection: ShopifyConnection | null };
+  return data.connection;
+}
+
 export async function getProductsNeedingColorEstimation(): Promise<ProductTask[]> {
   const response = await fetch(`${getApiUrl()}/api/queries/products-needing-color-estimation`, {
     headers: { 'X-API-Key':  getApiKey() },
@@ -68,12 +86,11 @@ export async function getProductsNeedingImageProcessing(): Promise<ProductTask[]
 }
 
 export async function getProductImage(
-  userId: string,
   aggregateId: string,
   variant: 'original' | 'processed' = 'original'
 ): Promise<Buffer> {
   const response = await fetch(
-    `${getApiUrl()}/api/queries/product-image?userId=${userId}&aggregateId=${aggregateId}&variant=${variant}`,
+    `${getApiUrl()}/api/queries/product-image?aggregateId=${aggregateId}&variant=${variant}`,
     { headers: { 'X-API-Key': getApiKey() } }
   );
 
@@ -85,9 +102,9 @@ export async function getProductImage(
   return Buffer.from(buffer);
 }
 
-export async function getProductState(userId: string, aggregateId: string): Promise<ProductStateResult> {
+export async function getProductState(aggregateId: string): Promise<ProductStateResult> {
   const response = await fetch(
-    `${getApiUrl()}/api/queries/product-state?userId=${userId}&aggregateId=${aggregateId}`,
+    `${getApiUrl()}/api/queries/product-state?aggregateId=${aggregateId}`,
     { headers: { 'X-API-Key': getApiKey() } }
   );
 
@@ -99,7 +116,6 @@ export async function getProductState(userId: string, aggregateId: string): Prom
 }
 
 export async function recordProductImageProcessed(
-  userId: string,
   aggregateId: string,
   imageBlob: string,
   mimeType: string,
@@ -113,7 +129,7 @@ export async function recordProductImageProcessed(
       'X-API-Key': getApiKey(),
       'Content-Type': 'application/json'
     },
-    body: JSON.stringify({ userId, aggregateId, imageBlob, mimeType, backgroundHex, model, sizePx })
+    body: JSON.stringify({ aggregateId, imageBlob, mimeType, backgroundHex, model, sizePx })
   });
 
   if (!response.ok) {
@@ -122,7 +138,6 @@ export async function recordProductImageProcessed(
 }
 
 export async function recordProductImageProcessingFailed(
-  userId: string,
   aggregateId: string,
   errorMessage: string,
   attemptNumber: number
@@ -133,7 +148,7 @@ export async function recordProductImageProcessingFailed(
       'X-API-Key': getApiKey(),
       'Content-Type': 'application/json'
     },
-    body: JSON.stringify({ userId, aggregateId, errorMessage, attemptNumber })
+    body: JSON.stringify({ aggregateId, errorMessage, attemptNumber })
   });
 
   if (!response.ok) {
@@ -141,27 +156,7 @@ export async function recordProductImageProcessingFailed(
   }
 }
 
-export async function recordProductColor(
-  userId: string,
-  aggregateId: string,
-  color: { r: number; g: number; b: number }
-): Promise<void> {
-  const response = await fetch(`${getApiUrl()}/api/commands/record-product-color`, {
-    method: 'POST',
-    headers: {
-      'X-API-Key': getApiKey(),
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({ userId, aggregateId, color })
-  });
-
-  if (!response.ok) {
-    throw new Error(`Failed to record color: ${response.statusText}`);
-  }
-}
-
 export async function setEstimatedColor(
-  userId: string,
   aggregateId: string,
   color: { r: number; g: number; b: number }
 ): Promise<void> {
@@ -171,7 +166,7 @@ export async function setEstimatedColor(
       'X-API-Key': getApiKey(),
       'Content-Type': 'application/json'
     },
-    body: JSON.stringify({ userId, aggregateId, color })
+    body: JSON.stringify({ aggregateId, color })
   });
 
   if (!response.ok) {
@@ -180,7 +175,6 @@ export async function setEstimatedColor(
 }
 
 export async function setColorV2(
-  userId: string,
   aggregateId: string,
   colorName: string
 ): Promise<void> {
@@ -190,7 +184,7 @@ export async function setColorV2(
       'X-API-Key': getApiKey(),
       'Content-Type': 'application/json'
     },
-    body: JSON.stringify({ userId, aggregateId, colorName })
+    body: JSON.stringify({ aggregateId, colorName })
   });
 
   if (!response.ok) {
@@ -212,11 +206,10 @@ export async function getProductsToCreateInShopify(): Promise<ProductTask[]> {
 }
 
 export async function getProductDetailsForShopify(
-  userId: string,
   aggregateId: string
 ): Promise<ProductDetails> {
   const response = await fetch(
-    `${getApiUrl()}/api/queries/product-details-for-shopify?userId=${userId}&aggregateId=${aggregateId}`,
+    `${getApiUrl()}/api/queries/product-details-for-shopify?aggregateId=${aggregateId}`,
     { headers: { 'X-API-Key': getApiKey() } }
   );
 
@@ -228,7 +221,6 @@ export async function getProductDetailsForShopify(
 }
 
 export async function recordProductCreated(
-  userId: string,
   aggregateId: string,
   shopifyVariantId: string
 ): Promise<void> {
@@ -239,7 +231,6 @@ export async function recordProductCreated(
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({
-      userId,
       aggregateId,
       shopifyVariantId,
       createdAt: Date.now()
@@ -252,7 +243,6 @@ export async function recordProductCreated(
 }
 
 export async function recordProductFailed(
-  userId: string,
   aggregateId: string,
   errorMessage: string,
   attemptNumber: number
@@ -264,7 +254,6 @@ export async function recordProductFailed(
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({
-      userId,
       aggregateId,
       errorMessage,
       attemptNumber
@@ -274,24 +263,4 @@ export async function recordProductFailed(
   if (!response.ok) {
     throw new Error(`Failed to record product failed: ${response.statusText}`);
   }
-}
-
-export interface ShopifyTokenResult {
-  accessToken: string;
-  expiresAt: number;
-  shop: string;
-}
-
-export async function getShopifyToken(userId: string): Promise<ShopifyTokenResult | null> {
-  const response = await fetch(
-    `${getApiUrl()}/api/queries/latest-shopify-token?userId=${userId}`,
-    { headers: { 'X-API-Key': getApiKey() } }
-  );
-
-  if (!response.ok) {
-    throw new Error(`Failed to get Shopify token: ${response.statusText}`);
-  }
-
-  const data = await response.json() as { token: ShopifyTokenResult | null };
-  return data.token;
 }

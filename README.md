@@ -42,15 +42,30 @@ Once a weight is entered, the variant can be created.
 
 ### 1. Shopify Setup
 
-1. Go to your Shopify Admin → Settings → Apps and sales channels → Develop apps
-2. Create a new app
-3. Configure Admin API scopes:
+Legacy in-admin custom apps can no longer be created; the app is distributed as
+a custom-distribution app owned by the operator:
+
+1. Go to https://dev.shopify.com/dashboard and create an app ("Start from Dev Dashboard")
+2. Create a version with these Admin API scopes:
    - `read_products`
    - `write_products`
    - `write_files`
+   - `read_files`
    - `read_locations`
    - `write_inventory`
-4. Install the app and copy the access token
+   - `read_inventory`
+3. Set the Redirect URI to `https://{your-domain}/api/auth/shopify/callback`
+   (add `http://localhost:3000/api/auth/shopify/callback` for local development)
+4. Release the version and install the app on the client's store
+   (custom distribution install link)
+5. Copy the Client ID and Client Secret from the app's Settings page into
+   `nextjs-app/.env`
+
+The store's access token is NOT configured anywhere: after logging in, the
+admin enters the store's `*.myshopify.com` domain on the dashboard and
+approves the app. That produces a non-expiring offline token, stored with the
+store's primary location in the system database. Until this happens, the app
+is locked for everyone.
 
 ### 2. Generate Secrets
 
@@ -79,16 +94,21 @@ npm install
 **nextjs-app/.env**
 ```env
 DATABASE_PATH=./data/system.db
-USER_DATABASES_PATH=./data/users
+STORE_DATABASE_PATH=./data/store.db
 
 JWT_SECRET=<your-generated-jwt-secret>
 JWT_EXPIRATION=7d
 
+# Required - the app refuses all requests if unset
 BACKGROUND_PROCESSOR_API_KEY=<your-generated-api-key>
 
-SHOPIFY_SHOP_DOMAIN=your-store.myshopify.com
-SHOPIFY_ACCESS_TOKEN=<your-shopify-admin-token>
-SHOPIFY_API_VERSION=2024-10
+# From the Dev Dashboard app (see Shopify Setup). Shop domain and inventory
+# location are captured in the UI connect flow, not configured here.
+SHOPIFY_CLIENT_ID=<your-app-client-id>
+SHOPIFY_CLIENT_SECRET=<your-app-client-secret>
+SHOPIFY_SCOPES=read_products,write_products,write_files,read_files,read_locations,write_inventory,read_inventory
+SHOPIFY_REDIRECT_URI=https://{your-domain}/api/auth/shopify/callback
+SHOPIFY_API_VERSION=2025-10
 
 PORT=3000
 ```
@@ -100,9 +120,9 @@ NEXTJS_API_KEY=<same-api-key-as-above>
 
 POLLING_INTERVAL_MS=5000
 
-SHOPIFY_SHOP_DOMAIN=your-store.myshopify.com
-SHOPIFY_ACCESS_TOKEN=<your-shopify-admin-token>
-SHOPIFY_API_VERSION=2024-10
+# The offline token, shop domain and location all come from the
+# /api/queries/shopify-connection endpoint - only the API version is env
+SHOPIFY_API_VERSION=2025-10
 
 OPENAI_API_KEY=<your-openai-api-key>
 OPENAI_IMAGE_MODEL=gpt-image-2
@@ -143,7 +163,24 @@ npm start
 
 1. Navigate to http://localhost:3000
 2. Create your admin account (first user)
-3. You're ready to start creating products!
+3. On the dashboard, enter your store's `*.myshopify.com` domain and approve
+   the app on Shopify (one-time; the offline token never expires)
+4. You're ready to start creating products! Additional users created by the
+   admin share the same store-wide inventory and are blocked until step 3 is
+   done.
+
+### Migrating from per-user databases
+
+Deployments that predate the shared store database can merge the old
+`data/users/*.db` event databases into `data/store.db`:
+
+```bash
+cd nextjs-app
+node scripts/migrate-to-store-db.js
+```
+
+Shopify token events are deliberately not migrated - the admin simply
+re-connects the store from the dashboard.
 
 ## Usage
 

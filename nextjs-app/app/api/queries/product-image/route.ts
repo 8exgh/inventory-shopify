@@ -15,19 +15,18 @@ export async function GET(request: NextRequest) {
 
     // Get query parameters
     const { searchParams } = new URL(request.url);
-    const userId = searchParams.get('userId');
     const aggregateId = searchParams.get('aggregateId');
     const variant = searchParams.get('variant') === 'processed' ? 'processed' : 'original';
 
-    if (!userId || !aggregateId) {
+    if (!aggregateId) {
       return NextResponse.json(
-        { error: 'Missing userId or aggregateId' },
+        { error: 'Missing aggregateId' },
         { status: 400 }
       );
     }
 
     // Get image
-    const image = getProductImage(userId, aggregateId, variant);
+    const image = getProductImage(aggregateId, variant);
 
     if (!image) {
       return NextResponse.json(

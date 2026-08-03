@@ -4,7 +4,7 @@ import {
   setEstimatedColor,
   setColorV2,
   getProductDetailsForShopify,
-  getShopifyToken
+  ShopifyConnection
 } from '../utils/api-client.js';
 import { estimateColor } from '../utils/color-estimation.js';
 import fetch from 'node-fetch';
@@ -98,7 +98,7 @@ function matchToAvailableColor(
   return closestColor;
 }
 
-export async function runColorEstimationJob(): Promise<void> {
+export async function runColorEstimationJob(connection: ShopifyConnection): Promise<void> {
   try {
     const tasks = await getProductsNeedingColorEstimation();
 
@@ -108,31 +108,24 @@ export async function runColorEstimationJob(): Promise<void> {
 
     console.log(`[Color Estimation] Found ${tasks.length} products needing color estimation`);
 
+    const { accessToken, shop } = connection;
+
     for (const task of tasks) {
       try {
         console.log(`[Color Estimation] Processing ${task.aggregateId}...`);
 
-        // Get user's Shopify token
-        const tokenResult = await getShopifyToken(task.userId);
-        if (!tokenResult) {
-          console.warn(`[Color Estimation] No valid Shopify token for user ${task.userId}, skipping ${task.aggregateId}`);
-          continue;
-        }
-
-        const { accessToken, shop } = tokenResult;
-
         // Get product details to get shopifyProductId
-        const productDetails = await getProductDetailsForShopify(task.userId, task.aggregateId);
+        const productDetails = await getProductDetailsForShopify(task.aggregateId);
 
         // Get image
-        const imageBuffer = await getProductImage(task.userId, task.aggregateId);
+        const imageBuffer = await getProductImage(task.aggregateId);
 
         // Estimate color from image
         const estimatedColor = await estimateColor(imageBuffer);
         console.log(`[Color Estimation] Estimated color: RGB(${estimatedColor.r}, ${estimatedColor.g}, ${estimatedColor.b})`);
 
         // Set estimated color
-        await setEstimatedColor(task.userId, task.aggregateId, estimatedColor);
+        await setEstimatedColor(task.aggregateId, estimatedColor);
         console.log(`[Color Estimation] Set estimated color for ${task.aggregateId}`);
 
         // Get available colors from Shopify product
@@ -144,7 +137,7 @@ export async function runColorEstimationJob(): Promise<void> {
         console.log(`[Color Estimation] Matched to color: ${matchedColor}`);
 
         // Set color v2 with matched color name
-        await setColorV2(task.userId, task.aggregateId, matchedColor);
+        await setColorV2(task.aggregateId, matchedColor);
         console.log(`[Color Estimation] Set color v2 for ${task.aggregateId}`);
 
       } catch (error: any) {

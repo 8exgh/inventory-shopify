@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyShopifyHmac } from '@/lib/shopify/hmac';
-import { handleStoreShopifyToken } from '@/lib/commands/shopify-token-commands';
+import { getUserById } from '@/lib/db/system';
+import { saveShopifyConnection } from '@/lib/db/shopify-connection';
 
 function getShopifyClientId(): string {
   return process.env.SHOPIFY_CLIENT_ID || '';
@@ -8,6 +9,10 @@ function getShopifyClientId(): string {
 
 function getShopifyClientSecret(): string {
   return process.env.SHOPIFY_CLIENT_SECRET || '';
+}
+
+function getShopifyApiVersion(): string {
+  return process.env.SHOPIFY_API_VERSION || '2025-10';
 }
 
 export async function GET(request: NextRequest) {
@@ -49,6 +54,14 @@ export async function GET(request: NextRequest) {
       return NextResponse.redirect(new URL('/dashboard?error=oauth_no_user', request.url));
     }
 
+    // Only an admin may complete the connection (the cookie alone proves
+    // nothing about the role)
+    const user = getUserById(userId);
+    if (!user || user.role !== 'admin') {
+      console.error('OAuth callback from non-admin user');
+      return NextResponse.redirect(new URL('/dashboard?error=oauth_not_admin', request.url));
+    }
+
     // Verify HMAC signature
     const clientSecret = getShopifyClientSecret();
     const queryParams: Record<string, string> = {};
@@ -61,7 +74,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.redirect(new URL('/dashboard?error=oauth_invalid_hmac', request.url));
     }
 
-    // Exchange code for access token
+    // Exchange code for an offline access token (no expiry, no associated user)
     const tokenResponse = await fetch(`https://${shop}/admin/oauth/access_token`, {
       method: 'POST',
       headers: {
@@ -83,33 +96,37 @@ export async function GET(request: NextRequest) {
     const tokenData = await tokenResponse.json() as {
       access_token: string;
       scope: string;
-      expires_in?: number;
-      associated_user_scope?: string;
-      associated_user?: {
-        id: number;
-        first_name: string;
-        last_name: string;
-        email: string;
-        account_owner: boolean;
-      };
     };
 
-    // Calculate expiration time
-    // Online tokens typically expire in 24 hours (86400 seconds)
-    // If expires_in is not provided, default to 24 hours
-    const expiresInMs = (tokenData.expires_in || 86400) * 1000;
-    const expiresAt = Date.now() + expiresInMs;
+    // Fetch the store's primary location so inventory can be set without any
+    // env configuration. This also proves the token works.
+    const shopResponse = await fetch(
+      `https://${shop}/admin/api/${getShopifyApiVersion()}/shop.json`,
+      { headers: { 'X-Shopify-Access-Token': tokenData.access_token } }
+    );
 
-    // Store token as event in user's database
-    handleStoreShopifyToken({
-      userId,
-      accessToken: tokenData.access_token,
-      expiresAt,
+    if (!shopResponse.ok) {
+      const errorText = await shopResponse.text();
+      console.error('Failed to fetch shop info after OAuth:', errorText);
+      return NextResponse.redirect(new URL('/dashboard?error=oauth_location_fetch', request.url));
+    }
+
+    const shopData = await shopResponse.json() as { shop: { primary_location_id: number } };
+    const locationId = shopData.shop?.primary_location_id;
+    if (!locationId) {
+      console.error('Shop info missing primary_location_id');
+      return NextResponse.redirect(new URL('/dashboard?error=oauth_location_fetch', request.url));
+    }
+
+    saveShopifyConnection({
+      shop,
+      access_token: tokenData.access_token,
       scope: tokenData.scope,
-      shop
+      location_id: String(locationId),
+      connected_by_user_id: userId
     });
 
-    console.log(`Shopify token stored for user ${userId}, expires at ${new Date(expiresAt).toISOString()}`);
+    console.log(`Shopify store ${shop} connected by user ${userId}`);
 
     // Clear OAuth cookies and redirect to dashboard
     const response = NextResponse.redirect(new URL('/dashboard?shopify=connected', request.url));

@@ -7,13 +7,14 @@ export type EventType =
   | 'ProductCreated'
   | 'ProductCreateFailed'
   | 'ProductImageProcessed'
-  | 'ProductImageProcessingFailed'
-  | 'ShopifyTokenReceived';
+  | 'ProductImageProcessingFailed';
 
 export interface BeginProductCreatedData {
   shopifyProductId: string;
   shopifyProductTitle: string;
   photoMimeType: string;
+  // Optional: events created before the shared store DB lack it
+  createdByUserId?: string;
 }
 
 export interface ColorEstimatedData {
@@ -52,13 +53,6 @@ export interface ProductImageProcessingFailedData {
   attemptNumber: number;
 }
 
-export interface ShopifyTokenReceivedData {
-  accessToken: string;
-  expiresAt: number;  // Unix timestamp ms
-  scope: string;
-  shop: string;
-}
-
 export type EventData =
   | BeginProductCreatedData
   | ColorEstimatedData
@@ -68,8 +62,7 @@ export type EventData =
   | ProductCreatedData
   | ProductCreateFailedData
   | ProductImageProcessedData
-  | ProductImageProcessingFailedData
-  | ShopifyTokenReceivedData;
+  | ProductImageProcessingFailedData;
 
 // Matches database columns with snake case
 export interface Event {
@@ -87,6 +80,7 @@ export interface ProductState {
   shopifyProductId?: string;
   shopifyProductTitle?: string;
   photoMimeType?: string;
+  createdByUserId?: string;
   estimatedColor?: { r: number; g: number; b: number };
   color?: string;
   weight?: string;

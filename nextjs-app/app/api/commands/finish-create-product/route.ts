@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { requireUserOrApiKey } from '@/lib/auth/middleware';
+import { requireAuth } from '@/lib/auth/middleware';
+import { getShopifyConnection } from '@/lib/db/shopify-connection';
 import { handleFinishCreateProduct } from '@/lib/commands/product-commands';
 
 const FinishCreateProductSchema = z.object({
-  userId: z.string().uuid(),
   aggregateId: z.string().uuid(),
   weight: z.string()
 });
@@ -24,11 +24,19 @@ export async function POST(request: NextRequest) {
     const command = validation.data;
 
     // Authenticate
-    const auth = requireUserOrApiKey(request, command.userId);
+    const auth = requireAuth(request);
     if (!auth.authenticated) {
       return NextResponse.json(
         { error: auth.error || 'Unauthorized' },
         { status: 401 }
+      );
+    }
+
+    // Nothing can be submitted until an admin has connected the store
+    if (!getShopifyConnection()) {
+      return NextResponse.json(
+        { error: 'Shopify store is not connected', code: 'SHOPIFY_NOT_CONNECTED' },
+        { status: 409 }
       );
     }
 

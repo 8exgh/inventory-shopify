@@ -32,6 +32,9 @@ export default function CreateProduct() {
       if (response.ok) {
         const data = await response.json();
         setProducts(data.products);
+      } else if (response.status === 409) {
+        // Store not connected — the dashboard shows the connect flow
+        router.push('/dashboard');
       }
     } catch (error) {
       console.error('Failed to load products:', error);
@@ -61,7 +64,6 @@ export default function CreateProduct() {
 
     try {
       const token = localStorage.getItem('token');
-      const userId = localStorage.getItem('userId');
       const aggregateId = uuidv4();
 
       const response = await fetch('/api/commands/begin-create-product', {
@@ -71,7 +73,6 @@ export default function CreateProduct() {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          userId,
           aggregateId,
           shopifyProductId: selectedProduct.id,
           shopifyProductTitle: selectedProduct.title,

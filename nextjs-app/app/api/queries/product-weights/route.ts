@@ -1,16 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { requireUserOrApiKey, requireApiKey } from '@/lib/auth/middleware';
-import { getLatestShopifyToken } from '@/lib/queries/shopify-token-queries';
+import { requireAuth } from '@/lib/auth/middleware';
+import { getShopifyConnection } from '@/lib/db/shopify-connection';
 
 const ProductWeightsSchema = z.object({
-  userId: z.string().uuid(),
   shopifyProductId: z.string()
 });
-
-function getShopifyShopDomain(): string {
-  return process.env.SHOPIFY_SHOP_DOMAIN || '';
-}
 
 function getShopifyApiVersion(): string {
   return process.env.SHOPIFY_API_VERSION || '2025-10';
@@ -57,10 +52,9 @@ async function getProductWeights(
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const userId = searchParams.get('userId');
     const shopifyProductId = searchParams.get('shopifyProductId');
 
-    const validation = ProductWeightsSchema.safeParse({ userId, shopifyProductId });
+    const validation = ProductWeightsSchema.safeParse({ shopifyProductId });
 
     if (!validation.success) {
       return NextResponse.json(
@@ -69,10 +63,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const { userId: validatedUserId } = validation.data;
-
-    // Require user authentication
-    const auth = requireUserOrApiKey(request, validatedUserId);
+    const auth = requireAuth(request);
     if (!auth.authenticated) {
       return NextResponse.json(
         { error: auth.error || 'Unauthorized' },
@@ -80,19 +71,19 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Get user's Shopify token
-    const token = getLatestShopifyToken(validatedUserId);
-    if (!token) {
+    // Get the store-level connection
+    const connection = getShopifyConnection();
+    if (!connection) {
       return NextResponse.json(
         { error: 'Shopify not connected', code: 'SHOPIFY_NOT_CONNECTED' },
-        { status: 401 }
+        { status: 409 }
       );
     }
 
     const weights = await getProductWeights(
       validation.data.shopifyProductId,
-      token.accessToken,
-      token.shop
+      connection.access_token,
+      connection.shop
     );
 
     return NextResponse.json({ weights });

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth/middleware';
-import { getShopifyConnection } from '@/lib/db/shopify-connection';
+import { getStoreProducts } from '@/lib/queries/product-queries';
 
 export async function GET(request: NextRequest) {
   try {
@@ -13,12 +13,12 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Empty until the store is connected; the Header renders nothing then
-    const connection = getShopifyConnection();
-    const shopUrl = connection ? `https://${connection.shop}` : '';
-    return NextResponse.json({ shopUrl });
+    // All staff share the store's inventory, so everyone sees every disc
+    const products = getStoreProducts();
+
+    return NextResponse.json({ products });
   } catch (error: any) {
-    console.error('Get shop info error:', error);
+    console.error('Get products error:', error);
     return NextResponse.json(
       { error: error.message || 'Internal server error' },
       { status: 500 }

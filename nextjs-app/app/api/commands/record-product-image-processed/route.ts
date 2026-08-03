@@ -4,7 +4,6 @@ import { requireApiKey } from '@/lib/auth/middleware';
 import { handleRecordProductImageProcessed } from '@/lib/commands/product-commands';
 
 const RecordProductImageProcessedSchema = z.object({
-  userId: z.string().uuid(),
   aggregateId: z.string().uuid(),
   imageBlob: z.string(),
   mimeType: z.string(),

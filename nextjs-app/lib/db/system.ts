@@ -43,6 +43,17 @@ function initializeSystemDb(db: Database.Database): void {
       created_at INTEGER NOT NULL,
       UNIQUE(email)
     );
+
+    CREATE TABLE IF NOT EXISTS shopify_connection (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      shop TEXT NOT NULL,
+      access_token TEXT NOT NULL,
+      scope TEXT NOT NULL,
+      location_id TEXT NOT NULL,
+      connected_by_user_id TEXT NOT NULL,
+      connected_at INTEGER NOT NULL,
+      status TEXT NOT NULL DEFAULT 'connected' CHECK (status IN ('connected', 'disconnected'))
+    );
   `);
 }
 

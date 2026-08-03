@@ -1,9 +1,3 @@
-import '@shopify/shopify-api/adapters/node';
-
-function getShopifyShopDomain(): string {
-  return process.env.SHOPIFY_SHOP_DOMAIN || '';
-}
-
 function getShopifyApiVersion(): string {
   return process.env.SHOPIFY_API_VERSION || '2025-10';
 }
@@ -36,9 +30,8 @@ export class ShopifyClient {
   private baseUrl: string;
   private headers: Record<string, string>;
 
-  constructor(accessToken: string, shop?: string) {
-    const shopDomain = shop || getShopifyShopDomain();
-    this.baseUrl = `https://${shopDomain}/admin/api/${getShopifyApiVersion()}`;
+  constructor(accessToken: string, shop: string) {
+    this.baseUrl = `https://${shop}/admin/api/${getShopifyApiVersion()}`;
     this.headers = {
       'X-Shopify-Access-Token': accessToken,
       'Content-Type': 'application/json',
@@ -185,6 +178,6 @@ export class ShopifyClient {
 /**
  * Factory function to create a ShopifyClient with a specific access token.
  */
-export function createShopifyClient(accessToken: string, shop?: string): ShopifyClient {
+export function createShopifyClient(accessToken: string, shop: string): ShopifyClient {
   return new ShopifyClient(accessToken, shop);
 }

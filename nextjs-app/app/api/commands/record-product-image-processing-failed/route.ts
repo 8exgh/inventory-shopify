@@ -4,7 +4,6 @@ import { requireApiKey } from '@/lib/auth/middleware';
 import { handleRecordProductImageProcessingFailed } from '@/lib/commands/product-commands';
 
 const RecordProductImageProcessingFailedSchema = z.object({
-  userId: z.string().uuid(),
   aggregateId: z.string().uuid(),
   errorMessage: z.string(),
   attemptNumber: z.number().int().positive()

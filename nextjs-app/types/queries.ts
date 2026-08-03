@@ -4,7 +4,6 @@ export interface ShopifyProduct {
 }
 
 export interface ProductTask {
-  userId: string;
   aggregateId: string;
 }
 
@@ -29,8 +28,9 @@ export interface ProductStateResult {
   imageProcessingError?: string;
 }
 
-export interface UserProduct {
+export interface StoreProduct {
   aggregateId: string;
   status: 'data-entry' | 'creating' | 'created' | 'failed';
   shopifyProductTitle: string;
+  createdByUserId?: string;
 }

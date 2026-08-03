@@ -1,10 +1,21 @@
-import { loadEvents, loadAllEvents, getPhotoBlob, getEventCount, getAllUserDatabases } from '@/lib/db/user-db';
+import { loadEvents, loadAllEvents, getPhotoBlob } from '@/lib/db/store-db';
 import { replayEvents } from '@/lib/commands/event-replay';
-import { ProductStateResult, UserProduct, ProductTask, ProductDetails } from '@/types/queries';
+import { ProductStateResult, StoreProduct, ProductTask, ProductDetails } from '@/types/queries';
 import { Event } from '@/types/events';
 
-export function getProductState(userId: string, aggregateId: string): ProductStateResult | null {
-  const events = loadEvents(userId, aggregateId);
+function groupEventsByAggregate(events: Event[]): Map<string, Event[]> {
+  const eventsByAggregate: Map<string, Event[]> = new Map();
+  for (const event of events) {
+    if (!eventsByAggregate.has(event.aggregate_id)) {
+      eventsByAggregate.set(event.aggregate_id, []);
+    }
+    eventsByAggregate.get(event.aggregate_id)!.push(event);
+  }
+  return eventsByAggregate;
+}
+
+export function getProductState(aggregateId: string): ProductStateResult | null {
+  const events = loadEvents(aggregateId);
   if (events.length === 0) {
     return null;
   }
@@ -29,27 +40,19 @@ export function getProductState(userId: string, aggregateId: string): ProductSta
   };
 }
 
-export function getUserProducts(userId: string): UserProduct[] {
-  const allEvents = loadAllEvents(userId);
-
-  // Group events by aggregateId
-  const eventsByAggregate: Map<string, Event[]> = new Map();
-  for (const event of allEvents) {
-    if (!eventsByAggregate.has(event.aggregate_id)) {
-      eventsByAggregate.set(event.aggregate_id, []);
-    }
-    eventsByAggregate.get(event.aggregate_id)!.push(event);
-  }
+export function getStoreProducts(): StoreProduct[] {
+  const eventsByAggregate = groupEventsByAggregate(loadAllEvents());
 
   // Replay each aggregate's events and build product list
-  const products: UserProduct[] = [];
+  const products: StoreProduct[] = [];
   for (const [aggregateId, events] of eventsByAggregate) {
     const state = replayEvents(events);
     if (state.status !== 'not-started' && state.shopifyProductTitle) {
       products.push({
         aggregateId,
         status: state.status as 'data-entry' | 'creating' | 'created' | 'failed',
-        shopifyProductTitle: state.shopifyProductTitle
+        shopifyProductTitle: state.shopifyProductTitle,
+        createdByUserId: state.createdByUserId
       });
     }
   }
@@ -59,28 +62,15 @@ export function getUserProducts(userId: string): UserProduct[] {
 
 export function getProductsNeedingColorEstimation(): ProductTask[] {
   const tasks: ProductTask[] = [];
-  const userIds = getAllUserDatabases();
+  const eventsByAggregate = groupEventsByAggregate(loadAllEvents());
 
-  for (const userId of userIds) {
-    const allEvents = loadAllEvents(userId);
+  // Find aggregates that have BeginProductCreated but no ColorEstimated
+  for (const [aggregateId, events] of eventsByAggregate) {
+    const hasBegun = events.some(e => e.event_type === 'BeginProductCreated');
+    const hasColor = events.some(e => e.event_type === 'ColorEstimated');
 
-    // Group events by aggregateId
-    const eventsByAggregate: Map<string, Event[]> = new Map();
-    for (const event of allEvents) {
-      if (!eventsByAggregate.has(event.aggregate_id)) {
-        eventsByAggregate.set(event.aggregate_id, []);
-      }
-      eventsByAggregate.get(event.aggregate_id)!.push(event);
-    }
-
-    // Find aggregates that have BeginProductCreated but no ColorEstimated
-    for (const [aggregateId, events] of eventsByAggregate) {
-      const hasBegun = events.some(e => e.event_type === 'BeginProductCreated');
-      const hasColor = events.some(e => e.event_type === 'ColorEstimated');
-
-      if (hasBegun && !hasColor) {
-        tasks.push({ userId, aggregateId });
-      }
+    if (hasBegun && !hasColor) {
+      tasks.push({ aggregateId });
     }
   }
 
@@ -91,32 +81,19 @@ export const MAX_IMAGE_PROCESSING_ATTEMPTS = 5;
 
 export function getProductsNeedingImageProcessing(): ProductTask[] {
   const tasks: ProductTask[] = [];
-  const userIds = getAllUserDatabases();
+  const eventsByAggregate = groupEventsByAggregate(loadAllEvents());
 
-  for (const userId of userIds) {
-    const allEvents = loadAllEvents(userId);
+  // Find aggregates that have a photo but no processed image, and have not
+  // exhausted their retries
+  for (const [aggregateId, events] of eventsByAggregate) {
+    const state = replayEvents(events);
 
-    // Group events by aggregateId
-    const eventsByAggregate: Map<string, Event[]> = new Map();
-    for (const event of allEvents) {
-      if (!eventsByAggregate.has(event.aggregate_id)) {
-        eventsByAggregate.set(event.aggregate_id, []);
-      }
-      eventsByAggregate.get(event.aggregate_id)!.push(event);
-    }
+    const hasBegun = events.some(e => e.event_type === 'BeginProductCreated');
+    const hasProcessed = events.some(e => e.event_type === 'ProductImageProcessed');
+    const failureCount = state.imageProcessingFailureCount || 0;
 
-    // Find aggregates that have a photo but no processed image, and have not
-    // exhausted their retries
-    for (const [aggregateId, events] of eventsByAggregate) {
-      const state = replayEvents(events);
-
-      const hasBegun = events.some(e => e.event_type === 'BeginProductCreated');
-      const hasProcessed = events.some(e => e.event_type === 'ProductImageProcessed');
-      const failureCount = state.imageProcessingFailureCount || 0;
-
-      if (hasBegun && !hasProcessed && failureCount < MAX_IMAGE_PROCESSING_ATTEMPTS) {
-        tasks.push({ userId, aggregateId });
-      }
+    if (hasBegun && !hasProcessed && failureCount < MAX_IMAGE_PROCESSING_ATTEMPTS) {
+      tasks.push({ aggregateId });
     }
   }
 
@@ -125,41 +102,28 @@ export function getProductsNeedingImageProcessing(): ProductTask[] {
 
 export function getProductsToCreateInShopify(): ProductTask[] {
   const tasks: ProductTask[] = [];
-  const userIds = getAllUserDatabases();
+  const eventsByAggregate = groupEventsByAggregate(loadAllEvents());
 
-  for (const userId of userIds) {
-    const allEvents = loadAllEvents(userId);
+  // Find aggregates that are ready but not created and have fewer than 5 failures
+  for (const [aggregateId, events] of eventsByAggregate) {
+    const state = replayEvents(events);
 
-    // Group events by aggregateId
-    const eventsByAggregate: Map<string, Event[]> = new Map();
-    for (const event of allEvents) {
-      if (!eventsByAggregate.has(event.aggregate_id)) {
-        eventsByAggregate.set(event.aggregate_id, []);
-      }
-      eventsByAggregate.get(event.aggregate_id)!.push(event);
-    }
+    const hasReadyEvent = events.some(e => e.event_type === 'ProductReadyToBeCreated');
+    const hasCreatedEvent = events.some(e => e.event_type === 'ProductCreated');
+    // Shopify receives the processed image, so creation waits for it
+    const hasProcessedImage = events.some(e => e.event_type === 'ProductImageProcessed');
+    const failureCount = state.failureCount || 0;
 
-    // Find aggregates that are ready but not created and have fewer than 5 failures
-    for (const [aggregateId, events] of eventsByAggregate) {
-      const state = replayEvents(events);
-
-      const hasReadyEvent = events.some(e => e.event_type === 'ProductReadyToBeCreated');
-      const hasCreatedEvent = events.some(e => e.event_type === 'ProductCreated');
-      // Shopify receives the processed image, so creation waits for it
-      const hasProcessedImage = events.some(e => e.event_type === 'ProductImageProcessed');
-      const failureCount = state.failureCount || 0;
-
-      if (hasReadyEvent && !hasCreatedEvent && hasProcessedImage && failureCount < 5) {
-        tasks.push({ userId, aggregateId });
-      }
+    if (hasReadyEvent && !hasCreatedEvent && hasProcessedImage && failureCount < 5) {
+      tasks.push({ aggregateId });
     }
   }
 
   return tasks;
 }
 
-export function getProductDetailsForShopify(userId: string, aggregateId: string): ProductDetails | null {
-  const events = loadEvents(userId, aggregateId);
+export function getProductDetailsForShopify(aggregateId: string): ProductDetails | null {
+  const events = loadEvents(aggregateId);
   if (events.length === 0) {
     return null;
   }
@@ -180,11 +144,10 @@ export function getProductDetailsForShopify(userId: string, aggregateId: string)
 }
 
 export function getProductImage(
-  userId: string,
   aggregateId: string,
   variant: 'original' | 'processed' = 'original'
 ): { blob: Buffer; mimeType: string } | null {
-  const events = loadEvents(userId, aggregateId);
+  const events = loadEvents(aggregateId);
   if (events.length === 0) {
     return null;
   }
@@ -193,7 +156,7 @@ export function getProductImage(
 
   const eventType = variant === 'processed' ? 'ProductImageProcessed' : 'BeginProductCreated';
   const mimeType = variant === 'processed' ? state.processedImageMimeType : state.photoMimeType;
-  const photoBlob = getPhotoBlob(userId, aggregateId, eventType);
+  const photoBlob = getPhotoBlob(aggregateId, eventType);
 
   if (!photoBlob || !mimeType) {
     return null;
