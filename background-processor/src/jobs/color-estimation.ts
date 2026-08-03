@@ -25,7 +25,15 @@ const COLOR_RGB_REFERENCES: Record<string, { r: number; g: number; b: number }> 
   'White': { r: 255, g: 255, b: 255 },
   'Black': { r: 0, g: 0, b: 0 },
   'Gray': { r: 128, g: 128, b: 128 },
-  'Brown': { r: 139, g: 69, b: 19 }
+  'Grey': { r: 128, g: 128, b: 128 },
+  'Brown': { r: 139, g: 69, b: 19 },
+  'Teal': { r: 0, g: 128, b: 128 },
+  'Chartreuse': { r: 127, g: 255, b: 0 },
+  // Glow plastic reads as a pale washed-out green in photos
+  'Glow': { r: 220, g: 245, b: 220 },
+  'Clear': { r: 230, g: 230, b: 230 },
+  'Off-White': { r: 245, g: 240, b: 230 },
+  'Blurple': { r: 110, g: 90, b: 230 }
 };
 
 async function getProductColors(

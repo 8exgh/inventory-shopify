@@ -22,7 +22,7 @@ async function getProductWeights(
   shop: string
 ): Promise<string[]> {
   const baseUrl = `https://${shop}/admin/api/${getShopifyApiVersion()}`;
-  const response = await fetch(`${baseUrl}/products/${shopifyProductId}/variants.json`, {
+  const response = await fetch(`${baseUrl}/products/${shopifyProductId}.json`, {
     headers: {
       'X-Shopify-Access-Token': accessToken,
       'Content-Type': 'application/json'
@@ -30,15 +30,24 @@ async function getProductWeights(
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to fetch variants: ${response.statusText}`);
+    throw new Error(`Failed to fetch product: ${response.statusText}`);
   }
 
   const data = await response.json() as any;
-  const weights = new Set<string>();
+  const product = data.product;
 
-  for (const variant of data.variants) {
-    if (variant.option2) {
-      weights.add(variant.option2);
+  // The per-disc weight descriptor lives in the product's last option:
+  // option2 on Color/Weight products, option3 on Colour/Plastic/Weight ones.
+  const optionCount = (product.options || []).length;
+  if (optionCount < 2 || optionCount > 3) {
+    return [];
+  }
+  const weightKey = optionCount === 2 ? 'option2' : 'option3';
+
+  const weights = new Set<string>();
+  for (const variant of product.variants || []) {
+    if (variant[weightKey]) {
+      weights.add(variant[weightKey]);
     }
   }
 

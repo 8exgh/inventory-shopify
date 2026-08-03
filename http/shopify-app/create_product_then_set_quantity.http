@@ -27,6 +27,10 @@ Content-Type: application/json
   "variant": {
     "option1": "{{colorName}}",
     "option2": "{{weight}}",
+    "price": "29.99",
+    "sku": "example-product-168-green",
+    "barcode": "aggregate-uuid-example",
+    "grams": 168,
     "inventory_management": "shopify",
     "inventory_policy": "deny",
     "image_id": {{imageId}}

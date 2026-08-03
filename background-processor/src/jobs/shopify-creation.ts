@@ -17,95 +17,13 @@ function getShopifyLocationId(): string {
     return SHOPIFY_LOCATION_ID;
 }
 
-const COLOR_NAMES: Record<string, string> = {
-    'Red': 'Red',
-    'Orange': 'Orange',
-    'Yellow': 'Yellow',
-    'Green': 'Green',
-    'Blue': 'Blue',
-    'Purple': 'Purple',
-    'Pink': 'Pink',
-    'White': 'White',
-    'Black': 'Black',
-    'Gray': 'Gray',
-    'Brown': 'Brown',
-    'Multi-Color': 'Multi-Color'
-};
-
-/**
- * RGB reference values for common color names
- */
-const COLOR_RGB_REFERENCES: Record<string, { r: number; g: number; b: number }> = {
-    'Red': {r: 255, g: 0, b: 0},
-    'Orange': {r: 255, g: 165, b: 0},
-    'Yellow': {r: 255, g: 255, b: 0},
-    'Green': {r: 0, g: 255, b: 0},
-    'Blue': {r: 0, g: 0, b: 255},
-    'Purple': {r: 128, g: 0, b: 128},
-    'Pink': {r: 255, g: 192, b: 203},
-    'White': {r: 255, g: 255, b: 255},
-    'Black': {r: 0, g: 0, b: 0},
-    'Gray': {r: 128, g: 128, b: 128},
-    'Brown': {r: 139, g: 69, b: 19}
-};
-
-/**
- * Extracts unique color values from product variants
- */
-function getAvailableColors(variants: any[]): string[] {
-    const colors = new Set<string>();
-    for (const variant of variants) {
-        if (variant.option1) {
-            colors.add(variant.option1);
-        }
-    }
-    return Array.from(colors);
-}
-
-/**
- * Matches an estimated RGB color to the closest available color from the product's variants
- */
-function matchToAvailableColor(
-    estimatedRgb: { r: number; g: number; b: number },
-    availableColors: string[]
-): string {
-    if (availableColors.length === 0) {
-        return 'Multi-Color'; // Fallback
-    }
-
-    if (availableColors.length === 1) {
-        return availableColors[0]; // Only one option
-    }
-
-    let minDistance = Infinity;
-    let closestColor = availableColors[0];
-
-    for (const colorName of availableColors) {
-        // Get RGB reference for this color name, or use a gray default
-        const refRgb = COLOR_RGB_REFERENCES[colorName] || {r: 128, g: 128, b: 128};
-
-        const distance = Math.sqrt(
-            Math.pow(estimatedRgb.r - refRgb.r, 2) +
-            Math.pow(estimatedRgb.g - refRgb.g, 2) +
-            Math.pow(estimatedRgb.b - refRgb.b, 2)
-        );
-
-        if (distance < minDistance) {
-            minDistance = distance;
-            closestColor = colorName;
-        }
-    }
-
-    return closestColor;
-}
-
-async function getExistingVariants(
+async function getProduct(
     productId: string,
     accessToken: string,
     shop: string
-): Promise<any[]> {
+): Promise<any> {
     const response = await fetch(
-        `https://${shop}/admin/api/${getShopifyApiVersion()}/products/${productId}/variants.json`,
+        `https://${shop}/admin/api/${getShopifyApiVersion()}/products/${productId}.json`,
         {
             headers: {
                 'X-Shopify-Access-Token': accessToken
@@ -114,11 +32,11 @@ async function getExistingVariants(
     );
 
     if (!response.ok) {
-        throw new Error(`Failed to get variants: ${response.statusText}`);
+        throw new Error(`Failed to get product: ${response.statusText}`);
     }
 
     const data = await response.json() as any;
-    return data.variants || [];
+    return data.product;
 }
 
 async function uploadImage(
@@ -186,14 +104,46 @@ async function setInventoryLevel(
     }
 }
 
+export interface NewVariantSpec {
+    option1: string;
+    option2: string;
+    option3?: string;
+    price?: string;
+    sku?: string;
+    barcode?: string;
+    grams?: number;
+    imageId: string;
+}
+
 export async function createVariant(
     productId: string,
-    colorName: string,
-    weight: string,
-    imageId: string,
+    spec: NewVariantSpec,
     accessToken: string,
     shop: string
 ): Promise<string> {
+    const variant: Record<string, unknown> = {
+        option1: spec.option1,
+        option2: spec.option2
+    };
+    if (spec.option3 !== undefined) {
+        variant.option3 = spec.option3;
+    }
+    if (spec.price !== undefined) {
+        variant.price = spec.price;
+    }
+    if (spec.sku !== undefined) {
+        variant.sku = spec.sku;
+    }
+    if (spec.barcode !== undefined) {
+        variant.barcode = spec.barcode;
+    }
+    if (spec.grams !== undefined) {
+        variant.grams = spec.grams;
+    }
+    variant.inventory_management = 'shopify';
+    variant.inventory_policy = 'deny';
+    variant.image_id = spec.imageId;
+
     // Step 1: Create variant (inventory_quantity is ignored when inventory_management='shopify')
     const response = await fetch(
         `https://${shop}/admin/api/${getShopifyApiVersion()}/products/${productId}/variants.json`,
@@ -203,15 +153,7 @@ export async function createVariant(
                 'X-Shopify-Access-Token': accessToken,
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({
-                variant: {
-                    option1: colorName,
-                    option2: weight,
-                    inventory_management: 'shopify',
-                    inventory_policy: 'deny',
-                    image_id: imageId
-                }
-            })
+            body: JSON.stringify({ variant })
         }
     );
 
@@ -230,20 +172,63 @@ export async function createVariant(
     return variantId;
 }
 
-function makeWeightUnique(baseWeight: string, existingVariants: any[]): string {
-    const existingWeights = new Set(
-        existingVariants.map(v => v.option2 || '').filter(Boolean)
+export function makeDiscDescriptorUnique(
+    baseDescriptor: string,
+    existingVariants: any[],
+    optionKey: 'option2' | 'option3'
+): { value: string; counter: number } {
+    const existingValues = new Set(
+        existingVariants.map(v => v[optionKey] || '').filter(Boolean)
     );
 
-    let weight = baseWeight;
-    let counter = 2;
+    let value = baseDescriptor;
+    let counter = 1;
 
-    while (existingWeights.has(weight)) {
-        weight = `${baseWeight} ${counter}`;
+    while (existingValues.has(value)) {
         counter++;
+        value = `${baseDescriptor} ${counter}`;
     }
 
-    return weight;
+    return { value, counter };
+}
+
+function slugify(text: string): string {
+    return text
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '');
+}
+
+// Weight strings are free text like "168G RED PRISM Foil"; the leading number
+// is the disc weight in grams.
+export function parseGrams(weightText: string): number | undefined {
+    const match = weightText.trim().match(/^(\d{2,3})/);
+    if (!match) {
+        return undefined;
+    }
+    return parseInt(match[1], 10);
+}
+
+export function buildSku(
+    productTitle: string,
+    grams: number | undefined,
+    colorName: string,
+    existingVariants: any[]
+): string {
+    const base = `${slugify(productTitle)}-${grams ?? 'na'}-${slugify(colorName)}`;
+    const existingSkus = new Set(
+        existingVariants.map(v => v.sku || '').filter(Boolean)
+    );
+
+    let sku = base;
+    let counter = 1;
+
+    while (existingSkus.has(sku)) {
+        counter++;
+        sku = `${base}-${counter}`;
+    }
+
+    return sku;
 }
 
 export async function runShopifyCreationJob(): Promise<void> {
@@ -275,22 +260,50 @@ export async function runShopifyCreationJob(): Promise<void> {
                 const details = await getProductDetailsForShopify(task.userId, task.aggregateId);
                 console.log(`[Shopify Creation] Details:`, details);
 
+                // Use the color that was already matched in color-estimation job
+                const colorName = details.color;
+                if (!colorName) {
+                    throw new Error('No color has been set for this disc (ColorSetV2 missing)');
+                }
+                console.log(`[Shopify Creation] Using color: ${colorName}`);
+
                 // Get the centered image on the light blue canvas. The work
                 // query guarantees ProductImageProcessed exists before a
                 // product reaches this job.
                 const imageBuffer = await getProductImage(task.userId, task.aggregateId, 'processed');
                 const imageBase64 = imageBuffer.toString('base64');
 
-                // Get existing variants to determine available weights
-                const existingVariants = await getExistingVariants(details.shopifyProductId, accessToken, shop);
+                // Fetch the full product: options tell us where the per-disc
+                // descriptor goes, variants provide uniqueness/price/plastic.
+                const product = await getProduct(details.shopifyProductId, accessToken, shop);
+                const existingVariants: any[] = product.variants || [];
+                const optionCount = (product.options || []).length;
 
-                // Use the color that was already matched in color-estimation job
-                const colorName = details.color;
-                console.log(`[Shopify Creation] Using color: ${colorName}`);
+                // 2 options: Color / Weight. 3 options: Colour / Plastic /
+                // per-disc descriptor — plastic is constant per product, so
+                // inherit it from an existing variant.
+                let plastic: string | undefined;
+                let discOptionKey: 'option2' | 'option3';
+                if (optionCount === 2) {
+                    discOptionKey = 'option2';
+                } else if (optionCount === 3) {
+                    discOptionKey = 'option3';
+                    plastic = existingVariants[0]?.option2;
+                    if (!plastic) {
+                        throw new Error(`Product ${details.shopifyProductId} has 3 options but no existing variant to inherit option2 (plastic) from`);
+                    }
+                } else {
+                    throw new Error(`Product ${details.shopifyProductId} has ${optionCount} option(s); expected 2 (Color/Weight) or 3 (Colour/Plastic/Weight)`);
+                }
 
-                // Make weight unique
-                const uniqueWeight = makeWeightUnique(details.weight!, existingVariants);
+                const { value: uniqueWeight } = makeDiscDescriptorUnique(details.weight!, existingVariants, discOptionKey);
                 console.log(`[Shopify Creation] Unique weight: ${uniqueWeight}`);
+
+                // Price is flat across a product's variants; inherit it so new
+                // variants don't land at 0.00.
+                const price = existingVariants.find(v => parseFloat(v.price) > 0)?.price;
+                const grams = parseGrams(details.weight!);
+                const sku = buildSku(product.title || details.shopifyProductTitle, grams, colorName, existingVariants);
 
                 // Upload image
                 const imageId = await uploadImage(details.shopifyProductId, imageBase64, accessToken, shop);
@@ -299,9 +312,18 @@ export async function runShopifyCreationJob(): Promise<void> {
                 // Create variant (now includes setting inventory to 1)
                 const variantId = await createVariant(
                     details.shopifyProductId,
-                    colorName!,
-                    uniqueWeight,
-                    imageId,
+                    {
+                        option1: colorName,
+                        option2: discOptionKey === 'option2' ? uniqueWeight : plastic!,
+                        option3: discOptionKey === 'option3' ? uniqueWeight : undefined,
+                        price,
+                        sku,
+                        // The aggregate UUID makes the Shopify variant traceable
+                        // back to the event log.
+                        barcode: task.aggregateId,
+                        grams,
+                        imageId
+                    },
                     accessToken,
                     shop
                 );
