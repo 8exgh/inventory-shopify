@@ -35,6 +35,7 @@ RUN npm ci --production
 # Copy Next.js build output from builder
 COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/next.config.* ./
+COPY --from=builder /app/scripts ./scripts
 # COPY --from=builder /app/public ./public
 
 # Create data directory (will be mounted as volume)
@@ -58,5 +59,5 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD node -e "require('http').get('http://localhost:3000/api/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
 
-# Start Next.js server
-CMD ["npm", "start"]
+# Apply system-db migrations, then start Next.js server
+CMD ["sh", "-c", "node scripts/migrate-system-db.js && npm start"]
