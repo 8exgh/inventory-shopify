@@ -23,6 +23,22 @@ export function CameraCapture({ onCapture }: CameraCaptureProps) {
     return () => stopStream();
   }, []);
 
+  // Attach the stream only after React has rendered the <video> element.
+  // Doing it in the click handler races the re-render (reliably fails on
+  // iOS Safari), and iOS also wants an explicit play().
+  useEffect(() => {
+    const video = videoRef.current;
+    const stream = streamRef.current;
+    if (!active || !video || !stream) {
+      return;
+    }
+    video.srcObject = stream;
+    video.play().catch(err => {
+      console.error('video.play() failed:', err);
+      setError(`Could not start the camera preview (${err?.name || 'unknown'}).`);
+    });
+  }, [active]);
+
   function stopStream() {
     streamRef.current?.getTracks().forEach(track => track.stop());
     streamRef.current = null;
@@ -37,14 +53,11 @@ export function CameraCapture({ onCapture }: CameraCaptureProps) {
       });
       streamRef.current = stream;
       setActive(true);
-      // The video element renders on the next tick once active flips
-      requestAnimationFrame(() => {
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-        }
-      });
     } catch (err: any) {
-      setError('Camera unavailable - use the file picker below instead.');
+      const reason = err?.name === 'NotAllowedError'
+        ? 'camera permission was denied - check Settings > Safari > Camera'
+        : err?.name || 'unknown error';
+      setError(`Camera unavailable (${reason}) - use the file picker below instead.`);
       console.error('getUserMedia failed:', err);
     }
   }
