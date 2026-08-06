@@ -29,20 +29,23 @@ export function Header() {
     }
   }
 
-  if (!shopUrl) return null;
-
   return (
     <header className="bg-white border-b border-gray-200 px-4 py-3">
       <div className="max-w-7xl mx-auto flex justify-between items-center">
-        <span className="text-lg font-semibold text-gray-900">Disc Golf Inventory</span>
-        <a
-          href={shopUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-blue-600 hover:text-blue-800 hover:underline text-sm"
-        >
-          {shopUrl}
-        </a>
+        <span className="flex items-center gap-2">
+          <img src="/logo.svg" alt="" className="h-7 w-7" />
+          <span className="text-lg font-semibold text-gray-900">Disc Golf Inventory</span>
+        </span>
+        {shopUrl && (
+          <a
+            href={shopUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-blue-600 hover:text-blue-800 hover:underline text-sm"
+          >
+            {shopUrl}
+          </a>
+        )}
       </div>
     </header>
   );
