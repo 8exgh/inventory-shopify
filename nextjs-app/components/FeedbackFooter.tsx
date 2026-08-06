@@ -7,6 +7,7 @@ export function FeedbackFooter() {
   const [message, setMessage] = useState('');
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
+  const [error, setError] = useState('');
   const [loggedIn, setLoggedIn] = useState(false);
 
   useEffect(() => {
@@ -21,6 +22,7 @@ export function FeedbackFooter() {
     }
 
     setSending(true);
+    setError('');
     try {
       const token = localStorage.getItem('token');
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
@@ -38,6 +40,9 @@ export function FeedbackFooter() {
         setMessage('');
         setSent(true);
         setTimeout(() => setSent(false), 3000);
+      } else if (response.status === 429) {
+        setError('Please wait a minute between feedback submissions.');
+        setTimeout(() => setError(''), 5000);
       }
     } catch (error) {
       console.error('Failed to submit feedback:', error);
@@ -76,6 +81,9 @@ export function FeedbackFooter() {
           </Link>
         )}
       </form>
+      {error && (
+        <p className="mx-auto mt-1 max-w-2xl text-xs text-red-600">{error}</p>
+      )}
     </div>
   );
 }

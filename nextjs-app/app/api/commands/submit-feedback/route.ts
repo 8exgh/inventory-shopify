@@ -2,10 +2,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { authenticateRequest } from '@/lib/auth/middleware';
 import { insertFeedback } from '@/lib/db/system';
+import { isRateLimited } from '@/lib/utils/rate-limit';
 
 const SubmitFeedbackSchema = z.object({
   message: z.string().trim().min(1).max(2000)
 });
+
+const RATE_LIMIT_WINDOW_MS = 60 * 1000; // one submission per minute
 
 // Deliberately public: the feedback box shows on the login page too.
 // A JWT, when present, attributes the entry to the submitter.
@@ -24,6 +27,21 @@ export async function POST(request: NextRequest) {
     const auth = authenticateRequest(request);
     const userId = auth.authenticated && !auth.isApiKey ? auth.userId || null : null;
     const tenantId = auth.authenticated && !auth.isApiKey ? auth.tenantId || null : null;
+
+    // One submission per minute, keyed by user when logged in, else by IP.
+    // (If the proxy doesn't forward client IPs, anonymous callers share one
+    // bucket - acceptable for a feedback box.)
+    const clientIp = request.headers.get('x-forwarded-for')?.split(',')[0].trim()
+      || request.headers.get('x-real-ip')
+      || 'anonymous';
+    const rateKey = userId ? `user:${userId}` : `ip:${clientIp}`;
+
+    if (isRateLimited(rateKey, RATE_LIMIT_WINDOW_MS)) {
+      return NextResponse.json(
+        { error: 'Please wait a minute between feedback submissions' },
+        { status: 429 }
+      );
+    }
 
     insertFeedback({
       message: validation.data.message,
