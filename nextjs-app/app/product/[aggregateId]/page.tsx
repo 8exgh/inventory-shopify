@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { Header } from '@/components/Header';
+import { Spinner } from '@/components/Spinner';
 
 interface ProductState {
   status: string;
@@ -232,8 +233,9 @@ export default function ProductDetail() {
                   className="w-full max-w-md rounded-lg"
                 />
               ) : (
-                <div className="w-full max-w-md h-64 bg-gray-200 rounded-lg flex items-center justify-center">
-                  <span className="text-gray-500">Loading image...</span>
+                <div className="w-full max-w-md h-64 bg-gray-200 rounded-lg flex items-center justify-center gap-2 text-gray-500">
+                  <Spinner />
+                  <span>Loading image...</span>
                 </div>
               )}
             </div>
@@ -275,9 +277,12 @@ export default function ProductDetail() {
                     )}
                   </select>
                 ) : (
-                  <div className="text-gray-600">
-                    {!productState.estimatedColor && 'Estimating color from photo...'}
-                    {productState.estimatedColor && !productState.color && 'Matching to available colors...'}
+                  <div className="flex items-center gap-2 text-gray-600">
+                    <Spinner />
+                    <span>
+                      {!productState.estimatedColor && 'Estimating color from photo...'}
+                      {productState.estimatedColor && !productState.color && 'Matching to available colors...'}
+                    </span>
                   </div>
                 )
               ) : (
@@ -317,8 +322,9 @@ export default function ProductDetail() {
             )}
 
             {isCreating && (
-              <div className="p-3 bg-blue-100 text-blue-700 rounded text-sm">
-                Creating in Shopify...
+              <div className="p-3 bg-blue-100 text-blue-700 rounded text-sm flex items-center gap-2">
+                <Spinner />
+                <span>Creating in Shopify...</span>
               </div>
             )}
 
@@ -336,8 +342,9 @@ export default function ProductDetail() {
 
             {canEdit && !productState.imageProcessed &&
               (productState.imageProcessingFailureCount || 0) < MAX_IMAGE_PROCESSING_ATTEMPTS && (
-              <div className="p-3 bg-blue-50 text-blue-700 rounded text-sm">
-                Preparing image&hellip; centering the disc and replacing the background.
+              <div className="p-3 bg-blue-50 text-blue-700 rounded text-sm flex items-center gap-2">
+                <Spinner />
+                <span>Preparing image&hellip; centering the disc and replacing the background.</span>
               </div>
             )}
 
@@ -358,9 +365,10 @@ export default function ProductDetail() {
               <button
                 onClick={handleFinish}
                 disabled={loading || !weight || !productState.estimatedColor || !productState.color || !productState.imageProcessed}
-                className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:bg-gray-400"
+                className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:bg-gray-400 flex items-center justify-center gap-2"
               >
-                {loading ? 'Creating...' : 'Create in Shopify'}
+                {loading && <Spinner />}
+                <span>{loading ? 'Creating...' : 'Create in Shopify'}</span>
               </button>
             )}
           </div>

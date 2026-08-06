@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { v4 as uuidv4 } from 'uuid';
 import { Header } from '@/components/Header';
+import { Spinner } from '@/components/Spinner';
 
 interface ShopifyProduct {
   id: string;
@@ -178,9 +179,10 @@ export default function CreateProduct() {
             <button
               onClick={handleSubmit}
               disabled={loading || !selectedProduct || !photo}
-              className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:bg-gray-400"
+              className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:bg-gray-400 flex items-center justify-center gap-2"
             >
-              {loading ? 'Creating...' : 'Next: Set Color & Weight'}
+              {loading && <Spinner />}
+              <span>{loading ? 'Creating...' : 'Next: Set Color & Weight'}</span>
             </button>
           </div>
         </div>
