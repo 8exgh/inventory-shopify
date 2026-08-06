@@ -9,6 +9,10 @@ export function FeedbackFooter() {
   const [sent, setSent] = useState(false);
   const [error, setError] = useState('');
   const [loggedIn, setLoggedIn] = useState(false);
+  const [focused, setFocused] = useState(false);
+
+  // Compact single line until focused; stays open while there is text
+  const expanded = focused || message.trim().length > 0;
 
   useEffect(() => {
     setLoggedIn(!!localStorage.getItem('token'));
@@ -55,15 +59,17 @@ export function FeedbackFooter() {
     <div className="border-t border-gray-200 bg-gray-50 px-4 py-3">
       <form
         onSubmit={handleSubmit}
-        className="mx-auto flex max-w-2xl items-center gap-2"
+        className="mx-auto flex max-w-2xl items-end gap-2"
       >
-        <input
-          type="text"
+        <textarea
           value={message}
           onChange={(e) => setMessage(e.target.value)}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
+          rows={expanded ? 20 : 1}
           placeholder={sent ? 'Thanks for the feedback!' : 'Have feedback? Tell us...'}
           maxLength={2000}
-          className="flex-1 rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="flex-1 resize-none rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-900 transition-all focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
         <button
           type="submit"
@@ -75,7 +81,7 @@ export function FeedbackFooter() {
         {loggedIn && (
           <Link
             href="/feedback"
-            className="whitespace-nowrap text-sm text-blue-600 hover:text-blue-800 hover:underline"
+            className="whitespace-nowrap py-1.5 text-sm text-blue-600 hover:text-blue-800 hover:underline"
           >
             View feedback
           </Link>
