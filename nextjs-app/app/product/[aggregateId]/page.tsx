@@ -20,11 +20,32 @@ interface ProductState {
 
 const MAX_IMAGE_PROCESSING_ATTEMPTS = 5;
 
+// Weight dropdown range (grams)
+const MIN_WEIGHT_G = 100;
+const MAX_WEIGHT_G = 300;
+const WEIGHT_OPTIONS = Array.from(
+  { length: MAX_WEIGHT_G - MIN_WEIGHT_G + 1 },
+  (_, i) => MIN_WEIGHT_G + i
+);
+
+// Existing variant values look like "179g pink rim orange silver foil":
+// a leading weight, then a free-text rim/foil description. Split them so
+// the weight feeds the dropdown format and the description feeds the
+// autocomplete. (This description is separate from the estimated disc color.)
+function splitWeightValue(value: string): { grams: number | null; description: string } {
+  const match = value.trim().match(/^(\d{2,3})\s*g\b\s*(.*)$/i);
+  if (!match) {
+    return { grams: null, description: value.trim() };
+  }
+  return { grams: parseInt(match[1], 10), description: match[2].trim() };
+}
+
 export default function ProductDetail() {
   const [productState, setProductState] = useState<ProductState | null>(null);
   const [availableColors, setAvailableColors] = useState<string[]>([]);
-  const [availableWeights, setAvailableWeights] = useState<string[]>([]);
-  const [weight, setWeight] = useState('');
+  const [availableDescriptions, setAvailableDescriptions] = useState<string[]>([]);
+  const [weightGrams, setWeightGrams] = useState('');
+  const [rimDescription, setRimDescription] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [imageUrl, setImageUrl] = useState<string>('');
@@ -120,7 +141,17 @@ export default function ProductDetail() {
 
       if (response.ok) {
         const data = await response.json();
-        setAvailableWeights(data.weights);
+        // Unique rim/foil descriptions from existing variants, weight stripped
+        const descriptions = new Set<string>();
+        for (const value of data.weights as string[]) {
+          const { description } = splitWeightValue(value);
+          // Drop the dedup suffix ("... foil 2") noise where present
+          const cleaned = description.replace(/\s+\d+$/, '').trim();
+          if (cleaned) {
+            descriptions.add(cleaned);
+          }
+        }
+        setAvailableDescriptions(Array.from(descriptions).sort());
       }
     } catch (error) {
       console.error('Failed to load product weights:', error);
@@ -154,10 +185,14 @@ export default function ProductDetail() {
   }
 
   async function handleFinish() {
-    if (!weight) {
-      setError('Please enter a weight');
+    if (!weightGrams) {
+      setError('Please select a weight');
       return;
     }
+
+    // Recombine into the variant value format: "179g pink rim orange silver foil"
+    const description = rimDescription.trim();
+    const weight = description ? `${weightGrams}g ${description}` : `${weightGrams}g`;
 
     setLoading(true);
     setError('');
@@ -291,27 +326,49 @@ export default function ProductDetail() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Weight
-              </label>
               {canEdit ? (
-                <>
-                  <input
-                    type="text"
-                    value={weight}
-                    onChange={(e) => setWeight(e.target.value)}
-                    placeholder="e.g., 168G RED PRISM Foil"
-                    list="weight-options"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
-                  />
-                  <datalist id="weight-options">
-                    {availableWeights.map(w => (
-                      <option key={w} value={w} />
-                    ))}
-                  </datalist>
-                </>
+                <div className="flex gap-3">
+                  <div className="w-32 shrink-0">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Weight
+                    </label>
+                    <select
+                      value={weightGrams}
+                      onChange={(e) => setWeightGrams(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                    >
+                      <option value="">-- g --</option>
+                      {WEIGHT_OPTIONS.map(g => (
+                        <option key={g} value={g}>{g}g</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="flex-1">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Rim / foil description
+                    </label>
+                    <input
+                      type="text"
+                      value={rimDescription}
+                      onChange={(e) => setRimDescription(e.target.value)}
+                      placeholder="e.g., pink rim orange silver foil"
+                      list="description-options"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                    />
+                    <datalist id="description-options">
+                      {availableDescriptions.map(d => (
+                        <option key={d} value={d} />
+                      ))}
+                    </datalist>
+                  </div>
+                </div>
               ) : (
-                <div className="text-gray-900">{productState.weight || 'Not set'}</div>
+                <>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Weight
+                  </label>
+                  <div className="text-gray-900">{productState.weight || 'Not set'}</div>
+                </>
               )}
             </div>
 
@@ -364,7 +421,7 @@ export default function ProductDetail() {
             {canEdit && (
               <button
                 onClick={handleFinish}
-                disabled={loading || !weight || !productState.estimatedColor || !productState.color || !productState.imageProcessed}
+                disabled={loading || !weightGrams || !productState.estimatedColor || !productState.color || !productState.imageProcessed}
                 className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:bg-gray-400 flex items-center justify-center gap-2"
               >
                 {loading && <Spinner />}
