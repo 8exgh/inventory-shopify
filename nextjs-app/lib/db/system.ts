@@ -70,6 +70,14 @@ function initializeSystemDb(db: Database.Database): void {
 
     CREATE UNIQUE INDEX IF NOT EXISTS idx_connections_shop_active
       ON shopify_connections(shop) WHERE status = 'connected';
+
+    CREATE TABLE IF NOT EXISTS feedback (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      message TEXT NOT NULL,
+      user_id TEXT,
+      tenant_id TEXT,
+      created_at INTEGER NOT NULL
+    );
   `);
 }
 
@@ -133,4 +141,34 @@ export function tenantExists(id: string): boolean {
 export function getUsersByTenant(tenantId: string): User[] {
   const db = getSystemDb();
   return db.prepare('SELECT * FROM users WHERE tenant_id = ?').all(tenantId) as User[];
+}
+
+export interface FeedbackEntry {
+  id: number;
+  message: string;
+  email: string | null; // null for anonymous (logged-out) submissions
+  created_at: number;
+}
+
+export function insertFeedback(params: {
+  message: string;
+  userId: string | null;
+  tenantId: string | null;
+}): void {
+  const db = getSystemDb();
+  db.prepare(`
+    INSERT INTO feedback (message, user_id, tenant_id, created_at)
+    VALUES (?, ?, ?, ?)
+  `).run(params.message, params.userId, params.tenantId, Date.now());
+}
+
+export function getAllFeedback(): FeedbackEntry[] {
+  const db = getSystemDb();
+  return db.prepare(`
+    SELECT f.id, f.message, u.email, f.created_at
+    FROM feedback f
+    LEFT JOIN users u ON u.id = f.user_id
+    ORDER BY f.created_at DESC
+    LIMIT 500
+  `).all() as FeedbackEntry[];
 }
