@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { v4 as uuidv4 } from 'uuid';
 import { Header } from '@/components/Header';
 import { Spinner } from '@/components/Spinner';
+import { CameraCapture } from '@/components/CameraCapture';
 
 interface ShopifyProduct {
   id: string;
@@ -154,10 +155,13 @@ export default function CreateProduct() {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Capture Photo
               </label>
+              <CameraCapture onCapture={setPhoto} />
+              <p className="mt-3 mb-1 text-xs text-gray-500">
+                Or choose an existing photo:
+              </p>
               <input
                 type="file"
                 accept="image/*"
-                capture="environment"
                 onChange={handlePhotoCapture}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
               />
