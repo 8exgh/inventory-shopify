@@ -3,7 +3,7 @@ import sharp from 'sharp';
 // Fraction of the image (centered) actually sampled: the disc sits in the
 // middle of the photo, so ignoring the outer border keeps the surface it is
 // lying on out of the average.
-const CENTER_SAMPLE_FRACTION = 0.6;
+const CENTER_SAMPLE_FRACTION = 0.4;
 
 export async function estimateColor(imageBuffer: Buffer): Promise<{ r: number; g: number; b: number }> {
   try {
@@ -15,7 +15,7 @@ export async function estimateColor(imageBuffer: Buffer): Promise<{ r: number; g
 
     const { data, info } = resized;
 
-    // Bounds of the centered sampling window (inner 60% per axis)
+    // Bounds of the centered sampling window (inner 40% per axis)
     const marginX = Math.round((info.width * (1 - CENTER_SAMPLE_FRACTION)) / 2);
     const marginY = Math.round((info.height * (1 - CENTER_SAMPLE_FRACTION)) / 2);
     const xStart = marginX;
