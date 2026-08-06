@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth/middleware';
 import { getProductImage } from '@/lib/queries/product-queries';
+import { getLogger } from '@/lib/logger';
+
+const log = getLogger('api/queries/product-image');
 
 export async function GET(request: NextRequest) {
   try {
@@ -62,7 +65,7 @@ export async function GET(request: NextRequest) {
       });
 
   } catch (error: any) {
-    console.error('Get product image error:', error);
+    log.error('Get product image error:', error);
     return NextResponse.json(
       { error: error.message || 'Internal server error' },
       { status: 500 }

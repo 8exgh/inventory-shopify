@@ -4,6 +4,9 @@ import { v4 as uuidv4 } from 'uuid';
 import { requireAdmin } from '@/lib/auth/middleware';
 import { createUser, getUserByEmail } from '@/lib/db/system';
 import { hashPassword, validatePassword } from '@/lib/auth/password';
+import { getLogger } from '@/lib/logger';
+
+const log = getLogger('api/admin/create-user');
 
 const CreateUserSchema = z.object({
   email: z.string().email(),
@@ -77,7 +80,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ userId });
   } catch (error: any) {
-    console.error('Create user error:', error);
+    log.error('Create user error:', error);
     return NextResponse.json(
       { error: error.message || 'Internal server error' },
       { status: 500 }

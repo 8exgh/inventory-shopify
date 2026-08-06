@@ -3,6 +3,9 @@ import { z } from 'zod';
 import { requireAuth } from '@/lib/auth/middleware';
 import { getShopifyConnection } from '@/lib/db/shopify-connection';
 import { handleBeginCreateProduct } from '@/lib/commands/product-commands';
+import { getLogger } from '@/lib/logger';
+
+const log = getLogger('api/commands/begin-create-product');
 
 const BeginCreateProductSchema = z.object({
   aggregateId: z.string().uuid(),
@@ -48,12 +51,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    log.info(`Disc intake ${validation.data.aggregateId} on product "${validation.data.shopifyProductTitle}" (tenant ${auth.tenantId}, user ${auth.userId})`);
+
     // Handle command
     handleBeginCreateProduct(auth.tenantId!, { ...validation.data, createdByUserId: auth.userId });
 
     return NextResponse.json({ success: true, aggregateId: validation.data.aggregateId });
   } catch (error: any) {
-    console.error('Begin create product error:', error);
+    log.error('Begin create product error:', error);
 
     if (error.message.includes('already started')) {
       return NextResponse.json(

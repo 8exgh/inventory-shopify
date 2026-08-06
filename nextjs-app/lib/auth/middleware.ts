@@ -1,5 +1,8 @@
 import { NextRequest } from 'next/server';
 import { verifyToken, JWTPayload } from './jwt';
+import { getLogger } from '@/lib/logger';
+
+const log = getLogger('auth/middleware');
 
 function getBackgroundProcessorApiKey(): string {
   const key = process.env.BACKGROUND_PROCESSOR_API_KEY;
@@ -28,6 +31,7 @@ export function authenticateRequest(request: NextRequest): AuthResult {
   // Check for JWT
   const authHeader = request.headers.get('Authorization');
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    log.debug('Auth failed: no credentials on request');
     return { authenticated: false, error: 'No authentication provided' };
   }
 
@@ -36,6 +40,7 @@ export function authenticateRequest(request: NextRequest): AuthResult {
 
   // Tokens minted before multi-tenancy lack tenantId and are invalid
   if (!payload || !payload.userId || !payload.tenantId) {
+    log.debug('Auth failed: invalid or pre-tenancy JWT');
     return { authenticated: false, error: 'Invalid token' };
   }
 

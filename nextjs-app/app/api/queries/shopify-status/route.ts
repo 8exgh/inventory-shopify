@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth/middleware';
 import { getShopifyConnection } from '@/lib/db/shopify-connection';
+import { getLogger } from '@/lib/logger';
+
+const log = getLogger('api/queries/shopify-status');
 
 /**
  * GET /api/queries/shopify-status
@@ -37,7 +40,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ connected: true, shop: connection.shop });
   } catch (error: any) {
-    console.error('Get Shopify status error:', error);
+    log.error('Get Shopify status error:', error);
     return NextResponse.json(
       { error: error.message || 'Internal server error' },
       { status: 500 }

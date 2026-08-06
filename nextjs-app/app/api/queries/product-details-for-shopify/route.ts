@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireApiKey } from '@/lib/auth/middleware';
 import { getProductDetailsForShopify } from '@/lib/queries/product-queries';
+import { getLogger } from '@/lib/logger';
+
+const log = getLogger('api/queries/product-details-for-shopify');
 
 export async function GET(request: NextRequest) {
   try {
@@ -37,7 +40,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(details);
   } catch (error: any) {
-    console.error('Get product details error:', error);
+    log.error('Get product details error:', error);
     return NextResponse.json(
       { error: error.message || 'Internal server error' },
       { status: 500 }

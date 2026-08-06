@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { requireApiKey } from '@/lib/auth/middleware';
 import { handleSetEstimatedColor } from '@/lib/commands/product-commands';
+import { getLogger } from '@/lib/logger';
+
+const log = getLogger('api/commands/set-estimated-color');
 
 const SetEstimatedColorSchema = z.object({
   tenantId: z.string().uuid(),
@@ -41,7 +44,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (error: any) {
-    console.error('Set estimated color error:', error);
+    log.error('Set estimated color error:', error);
 
     if (error.message.includes('not started')) {
       return NextResponse.json(

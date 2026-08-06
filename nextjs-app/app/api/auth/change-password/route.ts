@@ -3,6 +3,9 @@ import { z } from 'zod';
 import { requireAuth } from '@/lib/auth/middleware';
 import { getUserById, updateUserPassword } from '@/lib/db/system';
 import { hashPassword, verifyPassword, validatePassword } from '@/lib/auth/password';
+import { getLogger } from '@/lib/logger';
+
+const log = getLogger('api/auth/change-password');
 
 const ChangePasswordSchema = z.object({
   oldPassword: z.string(),
@@ -67,7 +70,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (error: any) {
-    console.error('Change password error:', error);
+    log.error('Change password error:', error);
     return NextResponse.json(
       { error: error.message || 'Internal server error' },
       { status: 500 }

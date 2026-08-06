@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { requireAuth } from '@/lib/auth/middleware';
 import { getShopifyConnection } from '@/lib/db/shopify-connection';
+import { getLogger } from '@/lib/logger';
+
+const log = getLogger('api/queries/product-weights');
 
 const ProductWeightsSchema = z.object({
   shopifyProductId: z.string()
@@ -95,7 +98,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ weights });
   } catch (error: any) {
-    console.error('Get product weights error:', error);
+    log.error('Get product weights error:', error);
     return NextResponse.json(
       { error: error.message || 'Internal server error' },
       { status: 500 }

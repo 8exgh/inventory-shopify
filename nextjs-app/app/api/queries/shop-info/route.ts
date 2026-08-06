@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth/middleware';
 import { getShopifyConnection } from '@/lib/db/shopify-connection';
+import { getLogger } from '@/lib/logger';
+
+const log = getLogger('api/queries/shop-info');
 
 export async function GET(request: NextRequest) {
   try {
@@ -22,7 +25,7 @@ export async function GET(request: NextRequest) {
     const shopUrl = connection ? `https://${connection.shop}` : '';
     return NextResponse.json({ shopUrl });
   } catch (error: any) {
-    console.error('Get shop info error:', error);
+    log.error('Get shop info error:', error);
     return NextResponse.json(
       { error: error.message || 'Internal server error' },
       { status: 500 }

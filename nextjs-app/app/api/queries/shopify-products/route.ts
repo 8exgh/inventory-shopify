@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth/middleware';
 import { createShopifyClient } from '@/lib/shopify/client';
 import { getShopifyConnection } from '@/lib/db/shopify-connection';
+import { getLogger } from '@/lib/logger';
+
+const log = getLogger('api/queries/shopify-products');
 
 export async function GET(request: NextRequest) {
   try {
@@ -37,7 +40,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ products });
   } catch (error: any) {
-    console.error('Get Shopify products error:', error);
+    log.error('Get Shopify products error:', error);
     return NextResponse.json(
       { error: error.message || 'Internal server error' },
       { status: 500 }

@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/auth/middleware';
 import { getUsersByTenant } from '@/lib/db/system';
+import { getLogger } from '@/lib/logger';
+
+const log = getLogger('api/admin/users');
 
 export async function GET(request: NextRequest) {
   try {
@@ -36,7 +39,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ users: sanitizedUsers });
   } catch (error: any) {
-    console.error('Get users error:', error);
+    log.error('Get users error:', error);
     return NextResponse.json(
       { error: error.message || 'Internal server error' },
       { status: 500 }

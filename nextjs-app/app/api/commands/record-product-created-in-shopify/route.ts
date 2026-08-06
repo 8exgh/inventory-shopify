@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { requireApiKey } from '@/lib/auth/middleware';
 import { handleRecordProductCreatedInShopify } from '@/lib/commands/product-commands';
+import { getLogger } from '@/lib/logger';
+
+const log = getLogger('api/commands/record-product-created-in-shopify');
 
 const RecordProductCreatedSchema = z.object({
   tenantId: z.string().uuid(),
@@ -38,7 +41,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (error: any) {
-    console.error('Record product created error:', error);
+    log.error('Record product created error:', error);
 
     if (error.message.includes('not in creating status')) {
       return NextResponse.json(

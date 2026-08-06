@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { requireAuth } from '@/lib/auth/middleware';
 import { handleSetColorV2 } from '@/lib/commands/product-commands';
+import { getLogger } from '@/lib/logger';
+
+const log = getLogger('api/commands/set-color-v2');
 
 const SetColorV2Schema = z.object({
   tenantId: z.string().uuid().optional(), // required for API-key callers
@@ -46,7 +49,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (error: any) {
-    console.error('Set color v2 error:', error);
+    log.error('Set color v2 error:', error);
 
     if (error.message.includes('not started')) {
       return NextResponse.json(

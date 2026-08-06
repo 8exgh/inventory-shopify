@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyShopifyHmac } from '@/lib/shopify/hmac';
 import { getUserById } from '@/lib/db/system';
 import { saveShopifyConnection, isShopConnectedByOtherTenant } from '@/lib/db/shopify-connection';
+import { getLogger } from '@/lib/logger';
+
+const log = getLogger('api/auth/shopify/callback');
 
 function getShopifyClientId(): string {
   return process.env.SHOPIFY_CLIENT_ID || '';
@@ -48,25 +51,25 @@ export async function GET(request: NextRequest) {
 
     // Validate required parameters
     if (!code || !state || !shop || !hmac) {
-      console.error('Missing OAuth callback parameters');
+      log.error('Missing OAuth callback parameters');
       return NextResponse.redirect(new URL('/dashboard?error=oauth_missing_params', baseUrl));
     }
 
     // Validate state (CSRF protection)
     if (state !== savedState) {
-      console.error('OAuth state mismatch');
+      log.error('OAuth state mismatch');
       return NextResponse.redirect(new URL('/dashboard?error=oauth_state_mismatch', baseUrl));
     }
 
     // Validate shop matches
     if (shop !== savedShop) {
-      console.error('OAuth shop mismatch');
+      log.error('OAuth shop mismatch');
       return NextResponse.redirect(new URL('/dashboard?error=oauth_shop_mismatch', baseUrl));
     }
 
     // Validate user ID exists
     if (!userId) {
-      console.error('Missing user ID in OAuth callback');
+      log.error('Missing user ID in OAuth callback');
       return NextResponse.redirect(new URL('/dashboard?error=oauth_no_user', baseUrl));
     }
 
@@ -74,7 +77,7 @@ export async function GET(request: NextRequest) {
     // nothing about the role)
     const user = getUserById(userId);
     if (!user || user.role !== 'admin') {
-      console.error('OAuth callback from non-admin user');
+      log.error('OAuth callback from non-admin user');
       return NextResponse.redirect(new URL('/dashboard?error=oauth_not_admin', baseUrl));
     }
 
@@ -85,8 +88,9 @@ export async function GET(request: NextRequest) {
       queryParams[key] = value;
     });
 
+    log.debug(`OAuth callback received for shop ${shop} (user ${userId})`);
     if (!verifyShopifyHmac(queryParams, clientSecret)) {
-      console.error('Invalid HMAC signature');
+      log.error('Invalid HMAC signature');
       return NextResponse.redirect(new URL('/dashboard?error=oauth_invalid_hmac', baseUrl));
     }
 
@@ -105,7 +109,7 @@ export async function GET(request: NextRequest) {
 
     if (!tokenResponse.ok) {
       const errorText = await tokenResponse.text();
-      console.error('Failed to exchange OAuth code:', errorText);
+      log.error('Failed to exchange OAuth code:', errorText);
       return NextResponse.redirect(new URL('/dashboard?error=oauth_token_exchange', baseUrl));
     }
 
@@ -113,6 +117,7 @@ export async function GET(request: NextRequest) {
       access_token: string;
       scope: string;
     };
+    log.info(`Offline token obtained for ${shop}`);
 
     // Fetch the store's primary location so inventory can be set without any
     // env configuration. This also proves the token works.
@@ -123,20 +128,21 @@ export async function GET(request: NextRequest) {
 
     if (!shopResponse.ok) {
       const errorText = await shopResponse.text();
-      console.error('Failed to fetch shop info after OAuth:', errorText);
+      log.error('Failed to fetch shop info after OAuth:', errorText);
       return NextResponse.redirect(new URL('/dashboard?error=oauth_location_fetch', baseUrl));
     }
 
     const shopData = await shopResponse.json() as { shop: { primary_location_id: number } };
+    log.debug(`shop.json fetched for ${shop}`);
     const locationId = shopData.shop?.primary_location_id;
     if (!locationId) {
-      console.error('Shop info missing primary_location_id');
+      log.error('Shop info missing primary_location_id');
       return NextResponse.redirect(new URL('/dashboard?error=oauth_location_fetch', baseUrl));
     }
 
     // A shop can be actively connected by only one tenant
     if (isShopConnectedByOtherTenant(shop, user.tenant_id)) {
-      console.error(`Shop ${shop} is already connected by another tenant`);
+      log.error(`Shop ${shop} is already connected by another tenant`);
       return NextResponse.redirect(new URL('/dashboard?error=oauth_shop_taken', baseUrl));
     }
 
@@ -156,7 +162,7 @@ export async function GET(request: NextRequest) {
       throw error;
     }
 
-    console.log(`Shopify store ${shop} connected by user ${userId} (tenant ${user.tenant_id})`);
+    log.info(`Shopify store ${shop} connected by user ${userId} (tenant ${user.tenant_id})`);
 
     // Clear OAuth cookies and redirect to dashboard
     const response = NextResponse.redirect(new URL('/dashboard?shopify=connected', baseUrl));
@@ -167,7 +173,7 @@ export async function GET(request: NextRequest) {
 
     return response;
   } catch (error: any) {
-    console.error('Shopify OAuth callback error:', error);
+    log.error('Shopify OAuth callback error:', error);
     return NextResponse.redirect(new URL('/dashboard?error=oauth_error', baseUrl));
   }
 }

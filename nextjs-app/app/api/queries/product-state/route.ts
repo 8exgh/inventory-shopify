@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth/middleware';
 import { getProductState } from '@/lib/queries/product-queries';
+import { getLogger } from '@/lib/logger';
+
+const log = getLogger('api/queries/product-state');
 
 export async function GET(request: NextRequest) {
   try {
@@ -45,7 +48,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(state);
   } catch (error: any) {
-    console.error('Get product state error:', error);
+    log.error('Get product state error:', error);
     return NextResponse.json(
       { error: error.message || 'Internal server error' },
       { status: 500 }

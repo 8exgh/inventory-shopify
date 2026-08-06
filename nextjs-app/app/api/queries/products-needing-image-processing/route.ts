@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireApiKey } from '@/lib/auth/middleware';
 import { getProductsNeedingImageProcessing } from '@/lib/queries/product-queries';
+import { getLogger } from '@/lib/logger';
+
+const log = getLogger('api/queries/products-needing-image-processing');
 
 export async function GET(request: NextRequest) {
   try {
@@ -18,7 +21,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ tasks });
   } catch (error: any) {
-    console.error('Get products needing image processing error:', error);
+    log.error('Get products needing image processing error:', error);
     return NextResponse.json(
       { error: error.message || 'Internal server error' },
       { status: 500 }

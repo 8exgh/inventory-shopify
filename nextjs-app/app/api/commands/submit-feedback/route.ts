@@ -3,6 +3,9 @@ import { z } from 'zod';
 import { authenticateRequest } from '@/lib/auth/middleware';
 import { insertFeedback } from '@/lib/db/system';
 import { isRateLimited } from '@/lib/utils/rate-limit';
+import { getLogger } from '@/lib/logger';
+
+const log = getLogger('api/commands/submit-feedback');
 
 const SubmitFeedbackSchema = z.object({
   message: z.string().trim().min(1).max(2000)
@@ -51,7 +54,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (error: any) {
-    console.error('Submit feedback error:', error);
+    log.error('Submit feedback error:', error);
     return NextResponse.json(
       { error: error.message || 'Internal server error' },
       { status: 500 }

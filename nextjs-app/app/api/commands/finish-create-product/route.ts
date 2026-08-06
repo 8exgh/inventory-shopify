@@ -3,6 +3,9 @@ import { z } from 'zod';
 import { requireAuth } from '@/lib/auth/middleware';
 import { getShopifyConnection } from '@/lib/db/shopify-connection';
 import { handleFinishCreateProduct } from '@/lib/commands/product-commands';
+import { getLogger } from '@/lib/logger';
+
+const log = getLogger('api/commands/finish-create-product');
 
 const FinishCreateProductSchema = z.object({
   tenantId: z.string().uuid().optional(), // required for API-key callers
@@ -50,12 +53,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    log.info(`Disc ${command.aggregateId} submitted with weight "${command.weight}" (tenant ${tenantId})`);
+
     // Handle command
     handleFinishCreateProduct(tenantId, command);
 
     return NextResponse.json({ success: true });
   } catch (error: any) {
-    console.error('Finish create product error:', error);
+    log.error('Finish create product error:', error);
 
     if (error.message.includes('not started') || error.message.includes('already submitted')) {
       return NextResponse.json(
