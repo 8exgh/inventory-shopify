@@ -15,7 +15,23 @@ function getShopifyApiVersion(): string {
   return process.env.SHOPIFY_API_VERSION || '2025-10';
 }
 
+// Behind the reverse proxy request.url resolves to the container's own
+// address (localhost:3000), so browser redirects must use the public origin.
+// SHOPIFY_REDIRECT_URI already carries it.
+function getPublicBaseUrl(request: NextRequest): string {
+  const redirectUri = process.env.SHOPIFY_REDIRECT_URI;
+  if (redirectUri) {
+    try {
+      return new URL(redirectUri).origin;
+    } catch {
+      // fall through to request.url
+    }
+  }
+  return request.url;
+}
+
 export async function GET(request: NextRequest) {
+  const baseUrl = getPublicBaseUrl(request);
   try {
     const { searchParams } = new URL(request.url);
 
@@ -33,25 +49,25 @@ export async function GET(request: NextRequest) {
     // Validate required parameters
     if (!code || !state || !shop || !hmac) {
       console.error('Missing OAuth callback parameters');
-      return NextResponse.redirect(new URL('/dashboard?error=oauth_missing_params', request.url));
+      return NextResponse.redirect(new URL('/dashboard?error=oauth_missing_params', baseUrl));
     }
 
     // Validate state (CSRF protection)
     if (state !== savedState) {
       console.error('OAuth state mismatch');
-      return NextResponse.redirect(new URL('/dashboard?error=oauth_state_mismatch', request.url));
+      return NextResponse.redirect(new URL('/dashboard?error=oauth_state_mismatch', baseUrl));
     }
 
     // Validate shop matches
     if (shop !== savedShop) {
       console.error('OAuth shop mismatch');
-      return NextResponse.redirect(new URL('/dashboard?error=oauth_shop_mismatch', request.url));
+      return NextResponse.redirect(new URL('/dashboard?error=oauth_shop_mismatch', baseUrl));
     }
 
     // Validate user ID exists
     if (!userId) {
       console.error('Missing user ID in OAuth callback');
-      return NextResponse.redirect(new URL('/dashboard?error=oauth_no_user', request.url));
+      return NextResponse.redirect(new URL('/dashboard?error=oauth_no_user', baseUrl));
     }
 
     // Only an admin may complete the connection (the cookie alone proves
@@ -59,7 +75,7 @@ export async function GET(request: NextRequest) {
     const user = getUserById(userId);
     if (!user || user.role !== 'admin') {
       console.error('OAuth callback from non-admin user');
-      return NextResponse.redirect(new URL('/dashboard?error=oauth_not_admin', request.url));
+      return NextResponse.redirect(new URL('/dashboard?error=oauth_not_admin', baseUrl));
     }
 
     // Verify HMAC signature
@@ -71,7 +87,7 @@ export async function GET(request: NextRequest) {
 
     if (!verifyShopifyHmac(queryParams, clientSecret)) {
       console.error('Invalid HMAC signature');
-      return NextResponse.redirect(new URL('/dashboard?error=oauth_invalid_hmac', request.url));
+      return NextResponse.redirect(new URL('/dashboard?error=oauth_invalid_hmac', baseUrl));
     }
 
     // Exchange code for an offline access token (no expiry, no associated user)
@@ -90,7 +106,7 @@ export async function GET(request: NextRequest) {
     if (!tokenResponse.ok) {
       const errorText = await tokenResponse.text();
       console.error('Failed to exchange OAuth code:', errorText);
-      return NextResponse.redirect(new URL('/dashboard?error=oauth_token_exchange', request.url));
+      return NextResponse.redirect(new URL('/dashboard?error=oauth_token_exchange', baseUrl));
     }
 
     const tokenData = await tokenResponse.json() as {
@@ -108,20 +124,20 @@ export async function GET(request: NextRequest) {
     if (!shopResponse.ok) {
       const errorText = await shopResponse.text();
       console.error('Failed to fetch shop info after OAuth:', errorText);
-      return NextResponse.redirect(new URL('/dashboard?error=oauth_location_fetch', request.url));
+      return NextResponse.redirect(new URL('/dashboard?error=oauth_location_fetch', baseUrl));
     }
 
     const shopData = await shopResponse.json() as { shop: { primary_location_id: number } };
     const locationId = shopData.shop?.primary_location_id;
     if (!locationId) {
       console.error('Shop info missing primary_location_id');
-      return NextResponse.redirect(new URL('/dashboard?error=oauth_location_fetch', request.url));
+      return NextResponse.redirect(new URL('/dashboard?error=oauth_location_fetch', baseUrl));
     }
 
     // A shop can be actively connected by only one tenant
     if (isShopConnectedByOtherTenant(shop, user.tenant_id)) {
       console.error(`Shop ${shop} is already connected by another tenant`);
-      return NextResponse.redirect(new URL('/dashboard?error=oauth_shop_taken', request.url));
+      return NextResponse.redirect(new URL('/dashboard?error=oauth_shop_taken', baseUrl));
     }
 
     try {
@@ -135,7 +151,7 @@ export async function GET(request: NextRequest) {
     } catch (error: any) {
       // Backstop for the partial unique index racing the check above
       if (error.code === 'SQLITE_CONSTRAINT_UNIQUE') {
-        return NextResponse.redirect(new URL('/dashboard?error=oauth_shop_taken', request.url));
+        return NextResponse.redirect(new URL('/dashboard?error=oauth_shop_taken', baseUrl));
       }
       throw error;
     }
@@ -143,7 +159,7 @@ export async function GET(request: NextRequest) {
     console.log(`Shopify store ${shop} connected by user ${userId} (tenant ${user.tenant_id})`);
 
     // Clear OAuth cookies and redirect to dashboard
-    const response = NextResponse.redirect(new URL('/dashboard?shopify=connected', request.url));
+    const response = NextResponse.redirect(new URL('/dashboard?shopify=connected', baseUrl));
 
     response.cookies.delete('shopify_oauth_state');
     response.cookies.delete('shopify_shop');
@@ -152,6 +168,6 @@ export async function GET(request: NextRequest) {
     return response;
   } catch (error: any) {
     console.error('Shopify OAuth callback error:', error);
-    return NextResponse.redirect(new URL('/dashboard?error=oauth_error', request.url));
+    return NextResponse.redirect(new URL('/dashboard?error=oauth_error', baseUrl));
   }
 }
