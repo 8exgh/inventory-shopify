@@ -45,14 +45,23 @@ export async function POST(request: NextRequest) {
 
     const tokenData = await exchangeResponse.json() as { access_token: string; scope: string };
 
-    const shopData = await shopifyGraphql(shop, tokenData.access_token, `
-      query PrimaryLocation { shop { primaryLocation { id } } }
+    // Shop.primaryLocation was removed from the Admin API; take the first
+    // active location that stocks inventory (falling back to the first active).
+    const locationData = await shopifyGraphql(shop, tokenData.access_token, `
+      query InventoryLocations {
+        locations(first: 10, includeInactive: false) {
+          nodes { id name shipsInventory }
+        }
+      }
     `);
-    const locationId: string | undefined = shopData.shop?.primaryLocation?.id;
+    const locations: Array<{ id: string; name: string; shipsInventory: boolean }> =
+      locationData.locations?.nodes || [];
+    const locationId = (locations.find(l => l.shipsInventory) || locations[0])?.id;
     if (!locationId) {
-      log.error(`No primary location for ${shop}`);
-      return NextResponse.json({ error: 'Store has no primary location' }, { status: 502 });
+      log.error(`No active location for ${shop}`);
+      return NextResponse.json({ error: 'Store has no active inventory location' }, { status: 502 });
     }
+    log.debug(`Using location ${locationId} for ${shop}`);
 
     const tenantId = provisionShopConnection({
       shop,
