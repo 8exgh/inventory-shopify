@@ -1,5 +1,7 @@
 import { NextRequest } from 'next/server';
 import { verifyToken, JWTPayload } from './jwt';
+import { verifySessionToken, shopFromSessionToken } from './session-token';
+import { getShopifyConnectionByShop } from '@/lib/db/shopify-connection';
 import { getLogger } from '@/lib/logger';
 
 const log = getLogger('auth/middleware');
@@ -18,6 +20,8 @@ export interface AuthResult {
   tenantId?: string;
   role?: 'admin' | 'restocker';
   isApiKey?: boolean;
+  isEmbedded?: boolean;
+  shop?: string;
   error?: string;
 }
 
@@ -38,19 +42,40 @@ export function authenticateRequest(request: NextRequest): AuthResult {
   const token = authHeader.substring(7);
   const payload = verifyToken(token);
 
-  // Tokens minted before multi-tenancy lack tenantId and are invalid
-  if (!payload || !payload.userId || !payload.tenantId) {
-    log.debug('Auth failed: invalid or pre-tenancy JWT');
-    return { authenticated: false, error: 'Invalid token' };
+  if (payload && payload.userId && payload.tenantId) {
+    return {
+      authenticated: true,
+      userId: payload.userId,
+      tenantId: payload.tenantId,
+      role: payload.role,
+      isApiKey: false
+    };
   }
 
-  return {
-    authenticated: true,
-    userId: payload.userId,
-    tenantId: payload.tenantId,
-    role: payload.role,
-    isApiKey: false
-  };
+  // Not one of our JWTs: try an App Bridge session token (embedded admin).
+  // Anyone Shopify lets into the app in the admin acts as the tenant admin.
+  const sessionPayload = verifySessionToken(token);
+  if (sessionPayload) {
+    const shop = shopFromSessionToken(sessionPayload);
+    const connection = getShopifyConnectionByShop(shop);
+    if (!connection || connection.status !== 'connected') {
+      log.debug(`Auth failed: session token for unprovisioned shop ${shop}`);
+      return { authenticated: false, error: 'Shop not provisioned' };
+    }
+    return {
+      authenticated: true,
+      userId: `shopify:${sessionPayload.sub}`,
+      tenantId: connection.tenant_id,
+      role: 'admin',
+      isApiKey: false,
+      isEmbedded: true,
+      shop
+    };
+  }
+
+  // Tokens minted before multi-tenancy lack tenantId and are invalid
+  log.debug('Auth failed: invalid or pre-tenancy JWT');
+  return { authenticated: false, error: 'Invalid token' };
 }
 
 export function requireAuth(request: NextRequest): AuthResult {

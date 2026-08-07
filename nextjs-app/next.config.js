@@ -1,7 +1,19 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  experimental: {
-    serverComponentsExternalPackages: ['better-sqlite3']
+  serverExternalPackages: ['better-sqlite3'],
+  async headers() {
+    return [
+      {
+        // Embedded app must render inside the Shopify admin iframe
+        source: '/embedded/:path*',
+        headers: [
+          {
+            key: 'Content-Security-Policy',
+            value: 'frame-ancestors https://admin.shopify.com https://*.myshopify.com;'
+          }
+        ]
+      }
+    ];
   }
 }
 

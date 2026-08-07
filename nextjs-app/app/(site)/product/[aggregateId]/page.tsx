@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { Header } from '@/components/Header';
 import { Spinner } from '@/components/Spinner';
+import { WEIGHT_OPTIONS, descriptionsFromWeights, combineWeight } from '@/lib/utils/weight';
 
 interface ProductState {
   status: string;
@@ -19,26 +20,6 @@ interface ProductState {
 }
 
 const MAX_IMAGE_PROCESSING_ATTEMPTS = 5;
-
-// Weight dropdown range (grams)
-const MIN_WEIGHT_G = 100;
-const MAX_WEIGHT_G = 300;
-const WEIGHT_OPTIONS = Array.from(
-  { length: MAX_WEIGHT_G - MIN_WEIGHT_G + 1 },
-  (_, i) => MIN_WEIGHT_G + i
-);
-
-// Existing variant values look like "179g pink rim orange silver foil":
-// a leading weight, then a free-text rim/foil description. Split them so
-// the weight feeds the dropdown format and the description feeds the
-// autocomplete. (This description is separate from the estimated disc color.)
-function splitWeightValue(value: string): { grams: number | null; description: string } {
-  const match = value.trim().match(/^(\d{2,3})\s*g\b\s*(.*)$/i);
-  if (!match) {
-    return { grams: null, description: value.trim() };
-  }
-  return { grams: parseInt(match[1], 10), description: match[2].trim() };
-}
 
 export default function ProductDetail() {
   const [productState, setProductState] = useState<ProductState | null>(null);
@@ -141,17 +122,7 @@ export default function ProductDetail() {
 
       if (response.ok) {
         const data = await response.json();
-        // Unique rim/foil descriptions from existing variants, weight stripped
-        const descriptions = new Set<string>();
-        for (const value of data.weights as string[]) {
-          const { description } = splitWeightValue(value);
-          // Drop the dedup suffix ("... foil 2") noise where present
-          const cleaned = description.replace(/\s+\d+$/, '').trim();
-          if (cleaned) {
-            descriptions.add(cleaned);
-          }
-        }
-        setAvailableDescriptions(Array.from(descriptions).sort());
+        setAvailableDescriptions(descriptionsFromWeights(data.weights));
       }
     } catch (error) {
       console.error('Failed to load product weights:', error);
@@ -191,8 +162,7 @@ export default function ProductDetail() {
     }
 
     // Recombine into the variant value format: "179g pink rim orange silver foil"
-    const description = rimDescription.trim();
-    const weight = description ? `${weightGrams}g ${description}` : `${weightGrams}g`;
+    const weight = combineWeight(weightGrams, rimDescription);
 
     setLoading(true);
     setError('');

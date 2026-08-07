@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 
 export default function Home() {
-  const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -25,8 +24,7 @@ export default function Home() {
     setError('');
 
     try {
-      const endpoint = isLogin ? '/api/auth/login' : '/api/auth/register';
-      const response = await fetch(endpoint, {
+      const response = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password })
@@ -65,13 +63,6 @@ export default function Home() {
         <h1 className="text-3xl font-bold text-center mb-8 text-gray-800">
           Disc Golf Inventory
         </h1>
-
-        {!isLogin && (
-          <div className="mb-4 p-3 bg-blue-100 text-blue-700 rounded text-sm">
-            This creates your store's admin account &mdash; you'll connect your
-            Shopify store right after, then you can invite your staff.
-          </div>
-        )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
@@ -113,20 +104,18 @@ export default function Home() {
             disabled={loading}
             className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:bg-gray-400"
           >
-            {loading ? 'Please wait...' : isLogin ? 'Login' : 'Register your store'}
+            {loading ? 'Please wait...' : 'Login'}
           </button>
         </form>
 
-        <div className="mt-4 text-center">
-          <button
-            onClick={() => {
-              setIsLogin(!isLogin);
-              setError('');
-            }}
-            className="text-blue-600 hover:text-blue-800 text-sm"
-          >
-            {isLogin ? 'New here? Register your store' : 'Already have an account? Login'}
-          </button>
+        <div className="mt-6 border-t border-gray-100 pt-4 text-center text-sm text-gray-500">
+          <p>
+            Staff accounts are created by your store admin inside the app.
+          </p>
+          <p className="mt-2">
+            New here? Install <span className="font-medium">Disc Golf Inventory</span> from
+            the Shopify App Store to get started.
+          </p>
         </div>
       </div>
     </div>

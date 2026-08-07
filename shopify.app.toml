@@ -1,0 +1,33 @@
+# Shopify app configuration - source of truth, deployed with `shopify app deploy`.
+# Adopt an existing dashboard app once with:
+#   shopify app config link --client-id <client-id>
+# then keep this file authoritative.
+
+client_id = "f1fefdba733ed40c0dd424574bd65ead"
+name = "Disc Golf Inventory"
+handle = "disc-golf-inventory"
+application_url = "https://shopify.fusenv.com/embedded"
+embedded = true
+
+[build]
+include_config_on_deploy = true
+
+[access_scopes]
+# Shopify managed installation: scopes granted at install, no OAuth redirect
+scopes = "read_products,write_products,read_files,write_files,read_locations,read_inventory,write_inventory"
+
+[auth]
+redirect_urls = [
+  "https://shopify.fusenv.com/api/auth/shopify/token-exchange"
+]
+
+[webhooks]
+api_version = "2025-10"
+
+[[webhooks.subscriptions]]
+topics = ["app/uninstalled"]
+compliance_topics = ["customers/data_request", "customers/redact", "shop/redact"]
+uri = "https://shopify.fusenv.com/api/webhooks/shopify"
+
+[pos]
+embedded = false
