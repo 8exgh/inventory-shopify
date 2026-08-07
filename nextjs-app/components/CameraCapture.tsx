@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { CenteringGuide } from './CenteringGuide';
 
 interface CameraCaptureProps {
   // Receives the captured photo as base64 (no data: prefix), always JPEG
@@ -112,22 +113,7 @@ export function CameraCapture({ onCapture }: CameraCaptureProps) {
           muted
           className="w-full"
         />
-        {/* Crosshair + centering circle overlay (sized to the color-sampling
-            region so the disc lands where the estimator looks) */}
-        <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-          <svg viewBox="0 0 100 100" className="h-full w-full" preserveAspectRatio="xMidYMid meet">
-            <g stroke="white" strokeWidth="0.6" opacity="0.9">
-              <line x1="50" y1="30" x2="50" y2="44" />
-              <line x1="50" y1="56" x2="50" y2="70" />
-              <line x1="30" y1="50" x2="44" y2="50" />
-              <line x1="56" y1="50" x2="70" y2="50" />
-              <circle cx="50" cy="50" r="28" fill="none" strokeDasharray="3 2" />
-            </g>
-            <g stroke="black" strokeWidth="0.15" opacity="0.5">
-              <circle cx="50" cy="50" r="28" fill="none" />
-            </g>
-          </svg>
-        </div>
+        <CenteringGuide />
       </div>
       <div className="mt-2 flex gap-2">
         <button

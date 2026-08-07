@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { v4 as uuidv4 } from 'uuid';
 import { embeddedFetch } from '@/lib/embedded/api';
 import { Spinner } from '@/components/Spinner';
+import { CenteringGuide } from '@/components/CenteringGuide';
 
 interface ShopifyProduct {
   id: string;
@@ -104,14 +105,32 @@ export default function EmbeddedCreate() {
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Disc photo</label>
+            {/* The Shopify admin iframe does not grant camera access, so the
+                live guided camera lives on the companion site; here we take a
+                photo or file and show the same guide over the preview. */}
             <input
               type="file"
               accept="image/*"
+              capture="environment"
               onChange={handlePhoto}
               className="w-full px-3 py-2 border border-gray-300 rounded-md text-gray-900"
             />
+            <p className="mt-2 text-xs text-gray-500">
+              Photographing a batch? Open{' '}
+              <span className="font-mono">shopify.fusenv.com</span> on your phone
+              for the guided camera with a centering crosshair.
+            </p>
             {photo && (
-              <img src={`data:image/jpeg;base64,${photo}`} alt="Preview" className="mt-4 max-w-full h-auto rounded-md" />
+              <>
+                <div className="relative mt-4 max-w-md overflow-hidden rounded-md">
+                  <img src={`data:image/jpeg;base64,${photo}`} alt="Preview" className="w-full h-auto" />
+                  <CenteringGuide />
+                </div>
+                <p className="mt-2 text-xs text-gray-500">
+                  Keep the disc inside the circle &mdash; that's the area the
+                  color estimate is read from.
+                </p>
+              </>
             )}
           </div>
 
