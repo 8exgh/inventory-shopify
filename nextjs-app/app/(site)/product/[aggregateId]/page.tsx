@@ -5,6 +5,7 @@ import { useRouter, useParams } from 'next/navigation';
 import { Header } from '@/components/Header';
 import { Spinner } from '@/components/Spinner';
 import { WEIGHT_OPTIONS, descriptionsFromWeights, combineWeight } from '@/lib/utils/weight';
+import { useProductImage } from '@/lib/hooks/useProductImage';
 
 interface ProductState {
   status: string;
@@ -21,6 +22,12 @@ interface ProductState {
 
 const MAX_IMAGE_PROCESSING_ATTEMPTS = 5;
 
+function authedFetch(url: string): Promise<Response> {
+  return fetch(url, {
+    headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+  });
+}
+
 export default function ProductDetail() {
   const [productState, setProductState] = useState<ProductState | null>(null);
   const [availableColors, setAvailableColors] = useState<string[]>([]);
@@ -29,7 +36,6 @@ export default function ProductDetail() {
   const [rimDescription, setRimDescription] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [imageUrl, setImageUrl] = useState<string>('');
   const router = useRouter();
   const params = useParams();
   const aggregateId = params.aggregateId as string;
@@ -42,43 +48,11 @@ export default function ProductDetail() {
     }
   }, [aggregateId]);
 
-  // Load product image
-  useEffect(() => {
-    loadProductImage('original');
-
-    // Cleanup object URL on unmount
-    return () => {
-      if (imageUrl) {
-        URL.revokeObjectURL(imageUrl);
-      }
-    };
-  }, [aggregateId]);
-
-  // Swap in the centered image once the background processor has produced it
-  useEffect(() => {
-    if (productState?.imageProcessed) {
-      loadProductImage('processed');
-    }
-  }, [productState?.imageProcessed]);
-
-  async function loadProductImage(variant: 'original' | 'processed') {
-    try {
-      const token = localStorage.getItem('token');
-
-      const response = await fetch(
-        `/api/queries/product-image?aggregateId=${aggregateId}&variant=${variant}`,
-        { headers: { 'Authorization': `Bearer ${token}` } }
-      );
-
-      if (response.ok) {
-        const blob = await response.blob();
-        const url = URL.createObjectURL(blob);
-        setImageUrl(url);
-      }
-    } catch (error) {
-      console.error('Failed to load product image:', error);
-    }
-  }
+  const imageUrl = useProductImage(
+    aggregateId,
+    productState?.imageProcessed ? 'processed' : 'original',
+    authedFetch
+  );
 
   useEffect(() => {
     loadProductState();

@@ -5,6 +5,7 @@ import { useRouter, useParams } from 'next/navigation';
 import { embeddedFetch } from '@/lib/embedded/api';
 import { Spinner } from '@/components/Spinner';
 import { WEIGHT_OPTIONS, descriptionsFromWeights, combineWeight } from '@/lib/utils/weight';
+import { useProductImage } from '@/lib/hooks/useProductImage';
 
 interface ProductState {
   status: string;
@@ -27,7 +28,6 @@ export default function EmbeddedProductDetail() {
   const [availableDescriptions, setAvailableDescriptions] = useState<string[]>([]);
   const [weightGrams, setWeightGrams] = useState('');
   const [rimDescription, setRimDescription] = useState('');
-  const [imageUrl, setImageUrl] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const router = useRouter();
@@ -40,9 +40,11 @@ export default function EmbeddedProductDetail() {
     return () => clearInterval(interval);
   }, [aggregateId]);
 
-  useEffect(() => {
-    loadImage(productState?.imageProcessed ? 'processed' : 'original');
-  }, [aggregateId, productState?.imageProcessed]);
+  const imageUrl = useProductImage(
+    aggregateId,
+    productState?.imageProcessed ? 'processed' : 'original',
+    embeddedFetch
+  );
 
   useEffect(() => {
     if (productState?.shopifyProductId) {
@@ -58,18 +60,6 @@ export default function EmbeddedProductDetail() {
       }
     } catch (error) {
       console.error('Failed to load product state:', error);
-    }
-  }
-
-  async function loadImage(variant: 'original' | 'processed') {
-    try {
-      const response = await embeddedFetch(`/api/queries/product-image?aggregateId=${aggregateId}&variant=${variant}`);
-      if (response.ok) {
-        const blob = await response.blob();
-        setImageUrl(URL.createObjectURL(blob));
-      }
-    } catch (error) {
-      console.error('Failed to load image:', error);
     }
   }
 
