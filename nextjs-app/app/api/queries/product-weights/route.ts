@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { requireAuth } from '@/lib/auth/middleware';
 import { getShopifyConnection } from '@/lib/db/shopify-connection';
+import { shopifyGraphql, toGid } from '@/lib/shopify/graphql';
 import { getLogger } from '@/lib/logger';
 
 const log = getLogger('api/queries/product-weights');
@@ -10,42 +11,40 @@ const ProductWeightsSchema = z.object({
   shopifyProductId: z.string()
 });
 
-function getShopifyApiVersion(): string {
-  return process.env.SHOPIFY_API_VERSION || '2025-10';
-}
-
 async function getProductWeights(
   shopifyProductId: string,
   accessToken: string,
   shop: string
 ): Promise<string[]> {
-  const baseUrl = `https://${shop}/admin/api/${getShopifyApiVersion()}`;
-  const response = await fetch(`${baseUrl}/products/${shopifyProductId}.json`, {
-    headers: {
-      'X-Shopify-Access-Token': accessToken,
-      'Content-Type': 'application/json'
+  const data = await shopifyGraphql(shop, accessToken, `
+    query ProductWeights($id: ID!) {
+      product(id: $id) {
+        options { name }
+        variants(first: 250) {
+          nodes { selectedOptions { name value } }
+        }
+      }
     }
-  });
+  `, { id: toGid('Product', shopifyProductId) });
 
-  if (!response.ok) {
-    throw new Error(`Failed to fetch product: ${response.statusText}`);
+  const product = data.product;
+  if (!product) {
+    return [];
   }
 
-  const data = await response.json() as any;
-  const product = data.product;
-
   // The per-disc weight descriptor lives in the product's last option:
-  // option2 on Color/Weight products, option3 on Colour/Plastic/Weight ones.
-  const optionCount = (product.options || []).length;
+  // the 2nd on Color/Weight products, the 3rd on Colour/Plastic/Weight ones.
+  const optionCount = product.options.length;
   if (optionCount < 2 || optionCount > 3) {
     return [];
   }
-  const weightKey = optionCount === 2 ? 'option2' : 'option3';
+  const weightOptionName = product.options[optionCount - 1].name;
 
   const weights = new Set<string>();
-  for (const variant of product.variants || []) {
-    if (variant[weightKey]) {
-      weights.add(variant[weightKey]);
+  for (const variant of product.variants.nodes) {
+    const value = variant.selectedOptions.find((o: any) => o.name === weightOptionName)?.value;
+    if (value) {
+      weights.add(value);
     }
   }
 

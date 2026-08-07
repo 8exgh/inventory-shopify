@@ -1,9 +1,73 @@
 import { describe, it, expect, jest, beforeEach, afterEach } from '@jest/globals';
-import { createVariant, makeDiscDescriptorUnique, parseGrams, buildSku } from './shopify-creation.js';
+import {
+  createVariant,
+  buildVariantInput,
+  makeDiscDescriptorUnique,
+  parseGrams,
+  buildSku,
+  NewVariantSpec
+} from './shopify-creation.js';
 
 // Mock environment variables
 process.env.SHOPIFY_API_VERSION = '2025-10';
 
+describe('buildVariantInput', () => {
+  const baseSpec: NewVariantSpec = {
+    optionValuesInOrder: ['Blue', '168g pink rim silver foil'],
+    price: '29.99',
+    sku: 'destroyer-halo-star-168-blue',
+    barcode: 'aggregate-uuid-1',
+    grams: 168,
+    mediaId: 'gid://shopify/MediaImage/111',
+    locationId: '12345678'
+  };
+
+  it('maps positional option values onto the product option names', () => {
+    const input = buildVariantInput(baseSpec, ['Color', 'Weight']);
+    expect(input.optionValues).toEqual([
+      { optionName: 'Color', name: 'Blue' },
+      { optionName: 'Weight', name: '168g pink rim silver foil' }
+    ]);
+  });
+
+  it('sets price, barcode, sku, grams and inventory of 1 at the location', () => {
+    const input = buildVariantInput(baseSpec, ['Color', 'Weight']) as any;
+    expect(input.price).toBe('29.99');
+    expect(input.barcode).toBe('aggregate-uuid-1');
+    expect(input.inventoryPolicy).toBe('DENY');
+    expect(input.inventoryItem).toEqual({
+      tracked: true,
+      sku: 'destroyer-halo-star-168-blue',
+      measurement: { weight: { unit: 'GRAMS', value: 168 } }
+    });
+    expect(input.inventoryQuantities).toEqual([
+      { availableQuantity: 1, locationId: 'gid://shopify/Location/12345678' }
+    ]);
+    expect(input.mediaId).toBe('gid://shopify/MediaImage/111');
+  });
+
+  it('omits optional fields when absent and supports 3-option products', () => {
+    const input = buildVariantInput(
+      {
+        optionValuesInOrder: ['Blue', 'Halo Star', '172g blue rim foil'],
+        mediaId: 'gid://shopify/MediaImage/1',
+        locationId: 'gid://shopify/Location/9'
+      },
+      ['Colour', 'Plastic', 'Weight']
+    ) as any;
+
+    expect(input.optionValues).toEqual([
+      { optionName: 'Colour', name: 'Blue' },
+      { optionName: 'Plastic', name: 'Halo Star' },
+      { optionName: 'Weight', name: '172g blue rim foil' }
+    ]);
+    expect(input).not.toHaveProperty('price');
+    expect(input).not.toHaveProperty('barcode');
+    expect(input.inventoryItem).toEqual({ tracked: true });
+    // Already-gid location passes through unchanged
+    expect(input.inventoryQuantities[0].locationId).toBe('gid://shopify/Location/9');
+  });
+});
 
 describe('createVariant', () => {
   beforeEach(() => {
@@ -16,98 +80,72 @@ describe('createVariant', () => {
     delete (global as any).fetch;
   });
 
-  it('should create a Shopify variant and return the variant ID', async () => {
-    // Arrange: variant creation, then the inventory level call
-    (global.fetch as any)
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ variant: { id: 67890, inventory_item_id: 1122334455 } })
+  it('sends one productVariantsBulkCreate mutation and returns the variant gid', async () => {
+    (global.fetch as any).mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        data: {
+          productVariantsBulkCreate: {
+            productVariants: [{ id: 'gid://shopify/ProductVariant/67890' }],
+            userErrors: []
+          }
+        }
       })
-      .mockResolvedValueOnce({ ok: true, json: async () => ({}) });
+    });
 
-    // Act
     const result = await createVariant(
       '12345',
       {
-        option1: 'Blue',
-        option2: '168G',
+        optionValuesInOrder: ['Blue', '168g'],
         price: '29.99',
-        sku: 'destroyer-halo-star-168-blue',
-        barcode: 'aggregate-uuid-1',
-        grams: 168,
-        imageId: '98765'
+        mediaId: 'gid://shopify/MediaImage/1',
+        locationId: '777'
       },
-      'shpca_test_token',
-      'test-store.myshopify.com',
-      '12345678'
+      ['Color', 'Weight'],
+      'shpat_test_token',
+      'test-store.myshopify.com'
     );
 
-    // Assert
-    expect(global.fetch).toHaveBeenCalledTimes(2); // Once for variant creation, once for inventory
-    expect(global.fetch).toHaveBeenCalledWith(
-      'https://test-store.myshopify.com/admin/api/2025-10/products/12345/variants.json',
-      expect.objectContaining({
-        method: 'POST',
-        headers: {
-          'X-Shopify-Access-Token': 'shpca_test_token',
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          variant: {
-            option1: 'Blue',
-            option2: '168G',
-            price: '29.99',
-            sku: 'destroyer-halo-star-168-blue',
-            barcode: 'aggregate-uuid-1',
-            grams: 168,
-            inventory_management: 'shopify',
-            inventory_policy: 'deny',
-            image_id: '98765'
-          }
-        })
-      })
-    );
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+    const [url, init] = (global.fetch as any).mock.calls[0];
+    expect(url).toBe('https://test-store.myshopify.com/admin/api/2025-10/graphql.json');
+    expect(init.headers['X-Shopify-Access-Token']).toBe('shpat_test_token');
 
-    // The inventory call uses the location passed in, not any env var
-    const inventoryBody = JSON.parse((global.fetch as any).mock.calls[1][1].body);
-    expect(inventoryBody).toEqual({
-      location_id: '12345678',
-      inventory_item_id: '1122334455',
-      available: 1
-    });
+    const body = JSON.parse(init.body);
+    expect(body.query).toContain('productVariantsBulkCreate');
+    expect(body.variables.productId).toBe('gid://shopify/Product/12345');
+    expect(body.variables.variants).toHaveLength(1);
+    expect(body.variables.variants[0].optionValues).toEqual([
+      { optionName: 'Color', name: 'Blue' },
+      { optionName: 'Weight', name: '168g' }
+    ]);
+    expect(body.variables.variants[0].inventoryQuantities).toEqual([
+      { availableQuantity: 1, locationId: 'gid://shopify/Location/777' }
+    ]);
 
-    expect(result).toBe('67890');
+    expect(result).toBe('gid://shopify/ProductVariant/67890');
   });
 
-  it('should place the disc descriptor in option3 for 3-option products', async () => {
-    (global.fetch as any)
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ variant: { id: 111, inventory_item_id: 222 } })
+  it('throws on userErrors', async () => {
+    (global.fetch as any).mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        data: {
+          productVariantsBulkCreate: {
+            productVariants: [],
+            userErrors: [{ field: ['variants', '0'], message: 'Option value taken' }]
+          }
+        }
       })
-      .mockResolvedValueOnce({ ok: true, json: async () => ({}) });
+    });
 
-    await createVariant(
+    await expect(createVariant(
       '12345',
-      {
-        option1: 'Blue',
-        option2: 'Halo Star',
-        option3: '172g blue rim rainbow foil',
-        imageId: '98765'
-      },
-      'shpca_test_token',
-      'test-store.myshopify.com',
-      '12345678'
-    );
-
-    const body = JSON.parse((global.fetch as any).mock.calls[0][1].body);
-    expect(body.variant.option2).toBe('Halo Star');
-    expect(body.variant.option3).toBe('172g blue rim rainbow foil');
-    // Optional fields stay absent when not provided
-    expect(body.variant).not.toHaveProperty('price');
-    expect(body.variant).not.toHaveProperty('sku');
-    expect(body.variant).not.toHaveProperty('grams');
-    expect(body.variant).not.toHaveProperty('barcode');
+      { optionValuesInOrder: ['Blue', '168g'], mediaId: 'm', locationId: '1' },
+      ['Color', 'Weight'],
+      'token',
+      'test-store.myshopify.com'
+    )).rejects.toThrow('Option value taken');
   });
 });
 

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyShopifyHmac } from '@/lib/shopify/hmac';
 import { getUserById } from '@/lib/db/system';
 import { saveShopifyConnection, isShopConnectedByOtherTenant } from '@/lib/db/shopify-connection';
+import { shopifyGraphql } from '@/lib/shopify/graphql';
 import { getLogger } from '@/lib/logger';
 
 const log = getLogger('api/auth/shopify/callback');
@@ -12,10 +13,6 @@ function getShopifyClientId(): string {
 
 function getShopifyClientSecret(): string {
   return process.env.SHOPIFY_CLIENT_SECRET || '';
-}
-
-function getShopifyApiVersion(): string {
-  return process.env.SHOPIFY_API_VERSION || '2025-10';
 }
 
 // Behind the reverse proxy request.url resolves to the container's own
@@ -121,22 +118,18 @@ export async function GET(request: NextRequest) {
 
     // Fetch the store's primary location so inventory can be set without any
     // env configuration. This also proves the token works.
-    const shopResponse = await fetch(
-      `https://${shop}/admin/api/${getShopifyApiVersion()}/shop.json`,
-      { headers: { 'X-Shopify-Access-Token': tokenData.access_token } }
-    );
-
-    if (!shopResponse.ok) {
-      const errorText = await shopResponse.text();
-      log.error('Failed to fetch shop info after OAuth:', errorText);
-      return NextResponse.redirect(new URL('/dashboard?error=oauth_location_fetch', baseUrl));
-    }
-
-    const shopData = await shopResponse.json() as { shop: { primary_location_id: number } };
-    log.debug(`shop.json fetched for ${shop}`);
-    const locationId = shopData.shop?.primary_location_id;
-    if (!locationId) {
-      log.error('Shop info missing primary_location_id');
+    let locationId: string;
+    try {
+      const shopData = await shopifyGraphql(shop, tokenData.access_token, `
+        query PrimaryLocation { shop { primaryLocation { id } } }
+      `);
+      locationId = shopData.shop?.primaryLocation?.id;
+      log.debug(`Primary location fetched for ${shop}: ${locationId}`);
+      if (!locationId) {
+        throw new Error('shop.primaryLocation missing');
+      }
+    } catch (error: any) {
+      log.error('Failed to fetch primary location after OAuth:', error);
       return NextResponse.redirect(new URL('/dashboard?error=oauth_location_fetch', baseUrl));
     }
 
@@ -151,7 +144,7 @@ export async function GET(request: NextRequest) {
         shop,
         access_token: tokenData.access_token,
         scope: tokenData.scope,
-        location_id: String(locationId),
+        location_id: locationId,
         connected_by_user_id: userId
       });
     } catch (error: any) {

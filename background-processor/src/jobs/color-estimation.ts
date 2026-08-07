@@ -7,12 +7,7 @@ import {
 } from '../utils/api-client.js';
 import { ConnectionMap, connectionForTenant } from '../utils/connection-registry.js';
 import { estimateColor } from '../utils/color-estimation.js';
-import fetch from 'node-fetch';
-
-function getShopifyApiVersion(): string {
-  const SHOPIFY_API_VERSION = process.env.SHOPIFY_API_VERSION || '2025-10';
-  return SHOPIFY_API_VERSION;
-}
+import { shopifyGraphql, toGid } from '../utils/shopify-graphql.js';
 
 const COLOR_RGB_REFERENCES: Record<string, { r: number; g: number; b: number }> = {
   'Red': { r: 255, g: 0, b: 0 },
@@ -36,29 +31,34 @@ const COLOR_RGB_REFERENCES: Record<string, { r: number; g: number; b: number }> 
   'Blurple': { r: 110, g: 90, b: 230 }
 };
 
+// The color option is the product's first option by convention
 async function getProductColors(
   shopifyProductId: string,
   accessToken: string,
   shop: string
 ): Promise<string[]> {
-  const baseUrl = `https://${shop}/admin/api/${getShopifyApiVersion()}`;
-  const response = await fetch(`${baseUrl}/products/${shopifyProductId}/variants.json`, {
-    headers: {
-      'X-Shopify-Access-Token': accessToken,
-      'Content-Type': 'application/json'
+  const data = await shopifyGraphql(shop, accessToken, `
+    query ProductColors($id: ID!) {
+      product(id: $id) {
+        options { name }
+        variants(first: 250) {
+          nodes { selectedOptions { name value } }
+        }
+      }
     }
-  });
+  `, { id: toGid('Product', shopifyProductId) });
 
-  if (!response.ok) {
-    throw new Error(`Failed to fetch product variants: ${response.statusText}`);
+  if (!data.product) {
+    throw new Error(`Product ${shopifyProductId} not found`);
   }
 
-  const data = await response.json() as any;
+  const colorOptionName = data.product.options[0]?.name;
   const colors = new Set<string>();
 
-  for (const variant of data.variants) {
-    if (variant.option1) {
-      colors.add(variant.option1);
+  for (const variant of data.product.variants.nodes) {
+    const value = variant.selectedOptions.find((o: any) => o.name === colorOptionName)?.value;
+    if (value) {
+      colors.add(value);
     }
   }
 

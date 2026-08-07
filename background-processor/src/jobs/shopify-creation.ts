@@ -6,160 +6,251 @@ import {
     recordProductFailed
 } from '../utils/api-client.js';
 import { ConnectionMap, connectionForTenant } from '../utils/connection-registry.js';
+import { shopifyGraphql, assertNoUserErrors, toGid } from '../utils/shopify-graphql.js';
 
-function getShopifyApiVersion(): string {
-    const SHOPIFY_API_VERSION = process.env.SHOPIFY_API_VERSION || '2025-10';
-    return SHOPIFY_API_VERSION;
+// Adapter shape kept close to the old REST payload so the uniqueness /
+// pricing / SKU helpers below stay unchanged: selectedOptions are mapped
+// positionally onto option1..option3.
+export interface ProductInfo {
+    id: string; // gid
+    title: string;
+    options: Array<{ name: string }>;
+    variants: Array<{
+        option1: string | null;
+        option2: string | null;
+        option3: string | null;
+        price: string | null;
+        sku: string | null;
+    }>;
 }
 
-async function getProduct(
+const PRODUCT_QUERY = `
+  query DiscProduct($id: ID!) {
+    product(id: $id) {
+      id
+      title
+      options { name }
+      variants(first: 250) {
+        nodes {
+          price
+          sku
+          selectedOptions { name value }
+        }
+      }
+    }
+  }
+`;
+
+export async function getProduct(
     productId: string,
     accessToken: string,
     shop: string
-): Promise<any> {
-    const response = await fetch(
-        `https://${shop}/admin/api/${getShopifyApiVersion()}/products/${productId}.json`,
-        {
-            headers: {
-                'X-Shopify-Access-Token': accessToken
-            }
-        }
-    );
+): Promise<ProductInfo> {
+    const data = await shopifyGraphql(shop, accessToken, PRODUCT_QUERY, {
+        id: toGid('Product', productId)
+    });
 
-    if (!response.ok) {
-        throw new Error(`Failed to get product: ${response.statusText}`);
+    const product = data.product;
+    if (!product) {
+        throw new Error(`Product ${productId} not found`);
     }
 
-    const data = await response.json() as any;
-    return data.product;
+    const optionNames: string[] = product.options.map((o: any) => o.name);
+
+    return {
+        id: product.id,
+        title: product.title,
+        options: product.options,
+        variants: product.variants.nodes.map((v: any) => {
+            const byName = new Map<string, string>(
+                v.selectedOptions.map((o: any) => [o.name, o.value])
+            );
+            return {
+                option1: optionNames[0] ? byName.get(optionNames[0]) ?? null : null,
+                option2: optionNames[1] ? byName.get(optionNames[1]) ?? null : null,
+                option3: optionNames[2] ? byName.get(optionNames[2]) ?? null : null,
+                price: v.price ?? null,
+                sku: v.sku ?? null
+            };
+        })
+    };
 }
 
-async function uploadImage(
+const STAGED_UPLOADS_CREATE = `
+  mutation StagedUploads($input: [StagedUploadInput!]!) {
+    stagedUploadsCreate(input: $input) {
+      stagedTargets {
+        url
+        resourceUrl
+        parameters { name value }
+      }
+      userErrors { field message }
+    }
+  }
+`;
+
+const PRODUCT_CREATE_MEDIA = `
+  mutation CreateMedia($productId: ID!, $media: [CreateMediaInput!]!) {
+    productCreateMedia(productId: $productId, media: $media) {
+      media {
+        ... on MediaImage { id }
+      }
+      mediaUserErrors { field message }
+    }
+  }
+`;
+
+const MEDIA_STATUS_QUERY = `
+  query MediaStatus($id: ID!) {
+    node(id: $id) {
+      ... on Media { status }
+    }
+  }
+`;
+
+// Staged upload -> attach to product -> wait until processed (a media still
+// in PROCESSING cannot be referenced by a new variant's mediaId).
+export async function uploadImage(
     productId: string,
-    imageBase64: string,
+    imageBuffer: Buffer,
+    filename: string,
     accessToken: string,
     shop: string
 ): Promise<string> {
-    const response = await fetch(
-        `https://${shop}/admin/api/${getShopifyApiVersion()}/products/${productId}/images.json`,
-        {
-            method: 'POST',
-            headers: {
-                'X-Shopify-Access-Token': accessToken,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                image: {
-                    attachment: imageBase64
-                }
-            })
-        }
-    );
+    const staged = await shopifyGraphql(shop, accessToken, STAGED_UPLOADS_CREATE, {
+        input: [{
+            resource: 'IMAGE',
+            filename,
+            mimeType: 'image/png',
+            httpMethod: 'POST',
+            fileSize: String(imageBuffer.length)
+        }]
+    });
+    assertNoUserErrors(staged.stagedUploadsCreate, 'stagedUploadsCreate');
 
-    if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Failed to upload image: ${response.statusText} - ${errorText}`);
+    const target = staged.stagedUploadsCreate.stagedTargets[0];
+    if (!target) {
+        throw new Error('stagedUploadsCreate returned no target');
     }
 
-    const data = await response.json() as any;
-    return data.image.id.toString();
-}
-
-async function setInventoryLevel(
-    inventoryItemId: string,
-    quantity: number,
-    accessToken: string,
-    shop: string,
-    locationId: string
-): Promise<void> {
-    const response = await fetch(
-        `https://${shop}/admin/api/${getShopifyApiVersion()}/inventory_levels/set.json`,
-        {
-            method: 'POST',
-            headers: {
-                'X-Shopify-Access-Token': accessToken,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                location_id: locationId,
-                inventory_item_id: inventoryItemId,
-                available: quantity
-            })
-        }
-    );
-
-    if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Failed to set inventory: ${response.statusText} - ${errorText}`);
+    const form = new FormData();
+    for (const param of target.parameters) {
+        form.append(param.name, param.value);
     }
+    form.append('file', new Blob([new Uint8Array(imageBuffer)], { type: 'image/png' }), filename);
+
+    const uploadResponse = await fetch(target.url, { method: 'POST', body: form });
+    if (!uploadResponse.ok) {
+        const text = await uploadResponse.text();
+        throw new Error(`Staged upload failed: ${uploadResponse.status} - ${text.substring(0, 300)}`);
+    }
+
+    const created = await shopifyGraphql(shop, accessToken, PRODUCT_CREATE_MEDIA, {
+        productId: toGid('Product', productId),
+        media: [{
+            originalSource: target.resourceUrl,
+            mediaContentType: 'IMAGE'
+        }]
+    });
+    if (created.productCreateMedia.mediaUserErrors?.length > 0) {
+        throw new Error(
+            `productCreateMedia: ${created.productCreateMedia.mediaUserErrors.map((e: any) => e.message).join('; ')}`
+        );
+    }
+
+    const mediaId: string | undefined = created.productCreateMedia.media?.[0]?.id;
+    if (!mediaId) {
+        throw new Error('productCreateMedia returned no media id');
+    }
+
+    // Poll until Shopify has processed the image (usually a second or two)
+    for (let attempt = 0; attempt < 15; attempt++) {
+        const statusData = await shopifyGraphql(shop, accessToken, MEDIA_STATUS_QUERY, { id: mediaId });
+        const status = statusData.node?.status;
+        if (status === 'READY') {
+            return mediaId;
+        }
+        if (status === 'FAILED') {
+            throw new Error(`Media ${mediaId} failed processing`);
+        }
+        await new Promise(resolve => setTimeout(resolve, 2000));
+    }
+    throw new Error(`Media ${mediaId} not ready after 30s`);
 }
 
 export interface NewVariantSpec {
-    option1: string;
-    option2: string;
-    option3?: string;
+    // Positional option values; zipped against the product's option names
+    optionValuesInOrder: string[];
     price?: string;
     sku?: string;
     barcode?: string;
     grams?: number;
-    imageId: string;
+    mediaId: string;
+    locationId: string;
+}
+
+const VARIANTS_BULK_CREATE = `
+  mutation CreateVariant($productId: ID!, $variants: [ProductVariantsBulkInput!]!) {
+    productVariantsBulkCreate(productId: $productId, variants: $variants) {
+      productVariants { id }
+      userErrors { field message }
+    }
+  }
+`;
+
+export function buildVariantInput(
+    spec: NewVariantSpec,
+    optionNames: string[]
+): Record<string, unknown> {
+    const inventoryItem: Record<string, unknown> = { tracked: true };
+    if (spec.sku !== undefined) {
+        inventoryItem.sku = spec.sku;
+    }
+    if (spec.grams !== undefined) {
+        inventoryItem.measurement = {
+            weight: { unit: 'GRAMS', value: spec.grams }
+        };
+    }
+
+    const variant: Record<string, unknown> = {
+        optionValues: spec.optionValuesInOrder.map((value, i) => ({
+            optionName: optionNames[i],
+            name: value
+        })),
+        inventoryPolicy: 'DENY',
+        inventoryItem,
+        inventoryQuantities: [{
+            availableQuantity: 1,
+            locationId: toGid('Location', spec.locationId)
+        }],
+        mediaId: spec.mediaId
+    };
+    if (spec.price !== undefined) {
+        variant.price = spec.price;
+    }
+    if (spec.barcode !== undefined) {
+        variant.barcode = spec.barcode;
+    }
+    return variant;
 }
 
 export async function createVariant(
     productId: string,
     spec: NewVariantSpec,
+    optionNames: string[],
     accessToken: string,
-    shop: string,
-    locationId: string
+    shop: string
 ): Promise<string> {
-    const variant: Record<string, unknown> = {
-        option1: spec.option1,
-        option2: spec.option2
-    };
-    if (spec.option3 !== undefined) {
-        variant.option3 = spec.option3;
-    }
-    if (spec.price !== undefined) {
-        variant.price = spec.price;
-    }
-    if (spec.sku !== undefined) {
-        variant.sku = spec.sku;
-    }
-    if (spec.barcode !== undefined) {
-        variant.barcode = spec.barcode;
-    }
-    if (spec.grams !== undefined) {
-        variant.grams = spec.grams;
-    }
-    variant.inventory_management = 'shopify';
-    variant.inventory_policy = 'deny';
-    variant.image_id = spec.imageId;
+    const data = await shopifyGraphql(shop, accessToken, VARIANTS_BULK_CREATE, {
+        productId: toGid('Product', productId),
+        variants: [buildVariantInput(spec, optionNames)]
+    });
+    assertNoUserErrors(data.productVariantsBulkCreate, 'productVariantsBulkCreate');
 
-    // Step 1: Create variant (inventory_quantity is ignored when inventory_management='shopify')
-    const response = await fetch(
-        `https://${shop}/admin/api/${getShopifyApiVersion()}/products/${productId}/variants.json`,
-        {
-            method: 'POST',
-            headers: {
-                'X-Shopify-Access-Token': accessToken,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ variant })
-        }
-    );
-
-    if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Failed to create variant: ${response.statusText} - ${errorText}`);
+    const variantId: string | undefined = data.productVariantsBulkCreate.productVariants?.[0]?.id;
+    if (!variantId) {
+        throw new Error('productVariantsBulkCreate returned no variant');
     }
-
-    const data = await response.json() as any;
-    const variantId = data.variant.id.toString();
-    const inventoryItemId = data.variant.inventory_item_id.toString();
-
-    // Step 2: Set inventory quantity to 1
-    await setInventoryLevel(inventoryItemId, 1, accessToken, shop, locationId);
-
     return variantId;
 }
 
@@ -190,8 +281,8 @@ function slugify(text: string): string {
         .replace(/^-+|-+$/g, '');
 }
 
-// Weight strings are free text like "168G RED PRISM Foil"; the leading number
-// is the disc weight in grams.
+// Weight strings are free text like "168g pink rim orange silver foil"; the
+// leading number is the disc weight in grams.
 export function parseGrams(weightText: string): number | undefined {
     const match = weightText.trim().match(/^(\d{2,3})/);
     if (!match) {
@@ -246,7 +337,6 @@ export async function runShopifyCreationJob(connections: ConnectionMap): Promise
 
                 // Get product details
                 const details = await getProductDetailsForShopify(task.tenantId, task.aggregateId);
-                console.log(`[Shopify Creation] Details:`, details);
 
                 // Use the color that was already matched in color-estimation job
                 const colorName = details.color;
@@ -259,13 +349,13 @@ export async function runShopifyCreationJob(connections: ConnectionMap): Promise
                 // query guarantees ProductImageProcessed exists before a
                 // product reaches this job.
                 const imageBuffer = await getProductImage(task.tenantId, task.aggregateId, 'processed');
-                const imageBase64 = imageBuffer.toString('base64');
 
                 // Fetch the full product: options tell us where the per-disc
                 // descriptor goes, variants provide uniqueness/price/plastic.
                 const product = await getProduct(details.shopifyProductId, accessToken, shop);
-                const existingVariants: any[] = product.variants || [];
-                const optionCount = (product.options || []).length;
+                const existingVariants = product.variants;
+                const optionNames = product.options.map(o => o.name);
+                const optionCount = optionNames.length;
 
                 // 2 options: Color / Weight. 3 options: Colour / Plastic /
                 // per-disc descriptor — plastic is constant per product, so
@@ -276,9 +366,9 @@ export async function runShopifyCreationJob(connections: ConnectionMap): Promise
                     discOptionKey = 'option2';
                 } else if (optionCount === 3) {
                     discOptionKey = 'option3';
-                    plastic = existingVariants[0]?.option2;
+                    plastic = existingVariants[0]?.option2 ?? undefined;
                     if (!plastic) {
-                        throw new Error(`Product ${details.shopifyProductId} has 3 options but no existing variant to inherit option2 (plastic) from`);
+                        throw new Error(`Product ${details.shopifyProductId} has 3 options but no existing variant to inherit ${optionNames[1]} (plastic) from`);
                     }
                 } else {
                     throw new Error(`Product ${details.shopifyProductId} has ${optionCount} option(s); expected 2 (Color/Weight) or 3 (Colour/Plastic/Weight)`);
@@ -289,32 +379,41 @@ export async function runShopifyCreationJob(connections: ConnectionMap): Promise
 
                 // Price is flat across a product's variants; inherit it so new
                 // variants don't land at 0.00.
-                const price = existingVariants.find(v => parseFloat(v.price) > 0)?.price;
+                const price = existingVariants.find(v => parseFloat(v.price || '0') > 0)?.price ?? undefined;
                 const grams = parseGrams(details.weight!);
                 const sku = buildSku(product.title || details.shopifyProductTitle, grams, colorName, existingVariants);
 
                 // Upload image
-                const imageId = await uploadImage(details.shopifyProductId, imageBase64, accessToken, shop);
-                console.log(`[Shopify Creation] Uploaded image: ${imageId}`);
+                const mediaId = await uploadImage(
+                    details.shopifyProductId,
+                    imageBuffer,
+                    `disc-${task.aggregateId}.png`,
+                    accessToken,
+                    shop
+                );
+                console.log(`[Shopify Creation] Uploaded media: ${mediaId}`);
 
-                // Create variant (now includes setting inventory to 1)
+                // Create variant (single mutation includes inventory of 1)
+                const optionValuesInOrder = discOptionKey === 'option2'
+                    ? [colorName, uniqueWeight]
+                    : [colorName, plastic!, uniqueWeight];
+
                 const variantId = await createVariant(
                     details.shopifyProductId,
                     {
-                        option1: colorName,
-                        option2: discOptionKey === 'option2' ? uniqueWeight : plastic!,
-                        option3: discOptionKey === 'option3' ? uniqueWeight : undefined,
+                        optionValuesInOrder,
                         price,
                         sku,
                         // The aggregate UUID makes the Shopify variant traceable
                         // back to the event log.
                         barcode: task.aggregateId,
                         grams,
-                        imageId
+                        mediaId,
+                        locationId
                     },
+                    optionNames,
                     accessToken,
-                    shop,
-                    locationId
+                    shop
                 );
                 console.log(`[Shopify Creation] Created variant: ${variantId}`);
 
