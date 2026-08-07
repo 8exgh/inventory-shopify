@@ -21,8 +21,9 @@ what remains is CLI config deploy + dashboard work, which requires your logins.
    ```
    This activates **managed installation** (scopes granted at install, token
    exchange, no OAuth redirect) and registers the compliance webhooks.
-3. **Partner API token** (billing enforcement): Partner Dashboard → Settings →
-   Partner API clients → create client with `View financials` access. Set GitHub
+3. **Partner API token** (billing enforcement): https://partners.shopify.com/191775751
+   → Settings → Partner API clients → create client with `View financials`
+   access. Org id is 191775751 and the app id is 407119855617. Set GitHub
    secrets in the devops repo: `SHOPIFY_SEAN_PARTNER_API_TOKEN`,
    `SHOPIFY_SEAN_PARTNER_ORG_ID` (number in your partner dashboard URL),
    `SHOPIFY_SEAN_PARTNER_APP_ID` (numeric app id). Until these are set the app
@@ -98,7 +99,16 @@ Use a fresh development store (not vbxsb1-cr) so reviewers see a clean install:
 
 ## 6. Submit
 
-Partner/Dev Dashboard → the app → Distribution → **Public** → Shopify App Store
-→ create listing (content above) → run automated checks → **Submit for review**.
+Everything app-level lives in the **Dev Dashboard** (this app is managed there,
+so partners.shopify.com/apps/... paths 404 - the Partner Dashboard uses
+different app ids):
+
+- App home: https://dev.shopify.com/dashboard/191775751/apps/407119855617
+  → **Distribution** → **Public** → App Store listing (content above) → run
+  automated checks → **Submit for review**.
+- Org-level only (payouts, business details, Partner API client for the
+  billing token): https://partners.shopify.com/191775751
+
+Distribution choice is one-time and irreversible - pick Public.
 Review responses arrive in the dashboard (post-April-2026 flow); expect possible
 revision rounds. Production is unaffected while in review.
