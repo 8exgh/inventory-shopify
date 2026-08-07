@@ -64,12 +64,10 @@ and lands them on `/embedded/welcome` afterward.
 ## 3. Media (you capture; specs below)
 
 - **Icon**: `docs/app-store/icon-1200.png` (1200×1200, generated from the app logo)
-- **Screenshots**: 3–6, 1600×900, no browser chrome, unique screens. Shot list:
-  1. Embedded dashboard with a few discs in different statuses
-  2. Disc detail mid-flow (photo processed, color matched, weight dropdown open)
-  3. A created variant shown on the Shopify product page (result!)
-  4. Staff accounts screen
-  5. Companion mobile capture with the crosshair camera (bonus)
+- **Screenshots — DONE**: four 1600×900 captures ready in
+  `docs/app-store/screenshots/` (dashboard, disc detail, add-disc, staff).
+  Optional extra: capture the created variant on a real Shopify product page
+  for a fifth "result" shot.
 - **Demo screencast (required)**: 2–3 min, English: install → plan approval →
   add a disc (photo → color/weight → create) → variant appears in Shopify admin
   → staff account + phone capture. Loom/QuickTime is fine.
@@ -83,8 +81,9 @@ Use a fresh development store (not vbxsb1-cr) so reviewers see a clean install:
 2. Install the app from the dashboard onto it; approve the (test) plan.
 3. Reviewer instructions text:
    `Open the app from the admin. Click "Add a disc", select a product, upload any round-object photo, wait ~30s for the image + color processing, pick a weight, click "Create in Shopify", then check the product in the admin — a new quantity-1 variant with image, SKU and price appears. Staff accounts (for phone photographers) are under "Staff accounts"; they log in at shopify.fusenv.com.`
-4. Test credentials: create a restocker account (e.g. `reviewer@fusenv.com` /
-   password you choose) and include it so they can verify the companion site.
+4. Test credentials — DONE: `reviewer@fusenv.com` / `DiscReview2026!` exists on
+   the production vbxsb1-cr tenant (restocker; prompts for a password change on
+   first login - mention that in the instructions).
 
 ## 5. Pre-submission checks
 
