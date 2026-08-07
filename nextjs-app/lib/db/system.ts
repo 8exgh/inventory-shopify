@@ -65,7 +65,11 @@ function initializeSystemDb(db: Database.Database): void {
       location_id TEXT NOT NULL,
       connected_by_user_id TEXT NOT NULL,
       connected_at INTEGER NOT NULL,
-      status TEXT NOT NULL DEFAULT 'connected' CHECK (status IN ('connected', 'disconnected'))
+      status TEXT NOT NULL DEFAULT 'connected' CHECK (status IN ('connected', 'disconnected')),
+      shop_numeric_id TEXT,
+      subscription_status TEXT,
+      trial_ends_at TEXT,
+      subscription_checked_at INTEGER
     );
 
     CREATE UNIQUE INDEX IF NOT EXISTS idx_connections_shop_active

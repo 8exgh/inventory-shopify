@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { requireAuth } from '@/lib/auth/middleware';
 import { getShopifyConnection } from '@/lib/db/shopify-connection';
+import { getSubscriptionStatus } from '@/lib/billing/subscription';
 import { handleFinishCreateProduct } from '@/lib/commands/product-commands';
 import { getLogger } from '@/lib/logger';
 
@@ -50,6 +51,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: 'Shopify store is not connected', code: 'SHOPIFY_NOT_CONNECTED' },
         { status: 409 }
+      );
+    }
+
+    // Trial expired / no plan: intake is the gated capability
+    const subscription = await getSubscriptionStatus(tenantId);
+    if (!subscription.subscribed) {
+      return NextResponse.json(
+        { error: 'An active subscription is required', code: 'SUBSCRIPTION_REQUIRED' },
+        { status: 402 }
       );
     }
 

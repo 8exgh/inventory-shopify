@@ -53,6 +53,30 @@ const MIGRATIONS = [
       db.exec('CREATE INDEX IF NOT EXISTS idx_users_tenant ON users(tenant_id)');
     }
   }
+,
+  {
+    // Billing cache columns for Shopify App Pricing status
+    id: '002-connection-billing-columns',
+    run(db) {
+      const table = db.prepare(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='shopify_connections'"
+      ).get();
+      if (!table) {
+        return; // fresh database: app DDL creates the full schema
+      }
+      const columns = db.prepare('PRAGMA table_info(shopify_connections)').all().map(c => c.name);
+      for (const [name, type] of [
+        ['shop_numeric_id', 'TEXT'],
+        ['subscription_status', 'TEXT'],
+        ['trial_ends_at', 'TEXT'],
+        ['subscription_checked_at', 'INTEGER']
+      ]) {
+        if (!columns.includes(name)) {
+          db.exec(`ALTER TABLE shopify_connections ADD COLUMN ${name} ${type}`);
+        }
+      }
+    }
+  }
 ];
 
 function main() {

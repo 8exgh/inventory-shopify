@@ -15,6 +15,8 @@ export default function EmbeddedDashboard() {
   const [booting, setBooting] = useState(true);
   const [bootError, setBootError] = useState('');
   const [products, setProducts] = useState<Product[]>([]);
+  const [needsPlan, setNeedsPlan] = useState(false);
+  const [planUrl, setPlanUrl] = useState('');
 
   useEffect(() => {
     boot();
@@ -23,6 +25,17 @@ export default function EmbeddedDashboard() {
   async function boot() {
     try {
       await ensureProvisioned();
+
+      const subResponse = await embeddedFetch('/api/queries/subscription-status');
+      if (subResponse.ok) {
+        const sub = await subResponse.json();
+        if (!sub.subscribed) {
+          setNeedsPlan(true);
+          setPlanUrl(sub.planUrl || '');
+          return;
+        }
+      }
+
       const response = await embeddedFetch('/api/queries/products');
       if (response.ok) {
         const data = await response.json();
@@ -58,6 +71,26 @@ export default function EmbeddedDashboard() {
     return (
       <div className="p-6">
         <div className="p-3 bg-red-100 text-red-700 rounded text-sm">{bootError}</div>
+      </div>
+    );
+  }
+
+  if (needsPlan) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-6">
+        <div className="max-w-md w-full bg-white rounded-lg shadow p-8 text-center">
+          <h1 className="text-2xl font-bold text-gray-900 mb-3">Choose your plan</h1>
+          <p className="text-sm text-gray-500 mb-6">
+            Disc Golf Inventory is $9/month with a 14-day free trial. Pick your
+            plan to start photographing discs.
+          </p>
+          <button
+            onClick={() => planUrl && window.open(planUrl, '_top')}
+            className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700"
+          >
+            View plans
+          </button>
+        </div>
       </div>
     );
   }
