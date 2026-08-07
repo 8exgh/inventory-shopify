@@ -1,9 +1,9 @@
 # Shopify app configuration - source of truth, deployed with `shopify app deploy`.
-# Learn more at https://shopify.dev/docs/apps/tools/cli/configuration
+# App lives in the 8Examples Inc. organization (publishable); the earlier app in
+# the Dev Disc Golf org could not be distributed publicly.
 
-client_id = "f1fefdba733ed40c0dd424574bd65ead"
+client_id = "7d64b85443b93189f1911020e5163b01"
 name = "Disc Golf Inventory"
-handle = "disc-golf-inventory"
 application_url = "https://shopify.fusenv.com/embedded"
 embedded = true
 
