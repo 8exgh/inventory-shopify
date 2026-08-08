@@ -157,7 +157,7 @@ export default function EmbeddedDashboard() {
 
       <p className="mt-4 text-xs text-gray-400">
         Tip: restockers can photograph discs from their phones at{' '}
-        <span className="font-mono">shopify.fusenv.com</span> using staff accounts
+        <span className="font-mono">inventory-reload.fusenv.com</span> using staff accounts
         you create under "Staff accounts".
       </p>
     </div>

@@ -117,7 +117,7 @@ export default function EmbeddedCreate() {
             />
             <p className="mt-2 text-xs text-gray-500">
               Photographing a batch? Open{' '}
-              <span className="font-mono">shopify.fusenv.com</span> on your phone
+              <span className="font-mono">inventory-reload.fusenv.com</span> on your phone
               for the guided camera with a centering crosshair.
             </p>
             {photo && (

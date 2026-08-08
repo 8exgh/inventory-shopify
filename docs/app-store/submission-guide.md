@@ -58,7 +58,7 @@ and lands them on `/embedded/welcome` afterward.
   - `Staff accounts for restockers — no Shopify admin access needed`
 - **Search terms** (5): `disc golf`, `inventory`, `one of one`, `variants`, `product photos`
 - **Categories**: Store management → Inventory management (adjust to available taxonomy)
-- **Privacy policy URL**: `https://shopify.fusenv.com/privacy`
+- **Privacy policy URL**: `https://inventory-reload.fusenv.com/privacy`
 - **Support**: `support@fusenv.com` (create this mailbox/alias before submitting)
 - **Emergency developer contact**: your email + phone (Partner Dashboard field)
 
@@ -81,7 +81,7 @@ Use a fresh development store (not vbxsb1-cr) so reviewers see a clean install:
    variants (so autocomplete has data).
 2. Install the app from the dashboard onto it; approve the (test) plan.
 3. Reviewer instructions text:
-   `Open the app from the admin. Click "Add a disc", select a product, upload any round-object photo, wait ~30s for the image + color processing, pick a weight, click "Create in Shopify", then check the product in the admin — a new quantity-1 variant with image, SKU and price appears. Staff accounts (for phone photographers) are under "Staff accounts"; they log in at shopify.fusenv.com.`
+   `Open the app from the admin. Click "Add a disc", select a product, upload any round-object photo, wait ~30s for the image + color processing, pick a weight, click "Create in Shopify", then check the product in the admin — a new quantity-1 variant with image, SKU and price appears. Staff accounts (for phone photographers) are under "Staff accounts"; they log in at inventory-reload.fusenv.com.`
 4. Test credentials — DONE: `reviewer@fusenv.com` / `DiscReview2026!` exists on
    the production vbxsb1-cr tenant (restocker; prompts for a password change on
    first login - mention that in the instructions).
@@ -93,7 +93,7 @@ Use a fresh development store (not vbxsb1-cr) so reviewers see a clean install:
 - Manual pass: fresh install on the demo store → no OAuth screen (managed
   install), app opens embedded, works in Chrome incognito; uninstall/reinstall
   works; webhook endpoint returns 401 on garbage HMAC
-  (`curl -X POST https://shopify.fusenv.com/api/webhooks/shopify -H 'X-Shopify-Hmac-Sha256: bogus' -d '{}'`).
+  (`curl -X POST https://inventory-reload.fusenv.com/api/webhooks/shopify -H 'X-Shopify-Hmac-Sha256: bogus' -d '{}'`).
 - **Protected customer data: opt OUT** on the submission page (the app is
   Level 0 — products/inventory only). This cannot be changed mid-review.
 

@@ -4,7 +4,7 @@
 
 client_id = "7d64b85443b93189f1911020e5163b01"
 name = "Disc Golf Inventory"
-application_url = "https://shopify.fusenv.com/embedded"
+application_url = "https://inventory-reload.fusenv.com/embedded"
 embedded = true
 
 [access_scopes]
@@ -14,7 +14,7 @@ use_legacy_install_flow = false
 
 [auth]
 redirect_urls = [
-  "https://shopify.fusenv.com/api/auth/shopify/token-exchange"
+  "https://inventory-reload.fusenv.com/api/auth/shopify/token-exchange"
 ]
 
 [webhooks]
@@ -23,4 +23,4 @@ api_version = "2026-07"
 [[webhooks.subscriptions]]
 topics = ["app/uninstalled"]
 compliance_topics = ["customers/data_request", "customers/redact", "shop/redact"]
-uri = "https://shopify.fusenv.com/api/webhooks/shopify"
+uri = "https://inventory-reload.fusenv.com/api/webhooks/shopify"

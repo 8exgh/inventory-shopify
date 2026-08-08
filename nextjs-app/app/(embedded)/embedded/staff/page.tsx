@@ -50,7 +50,7 @@ export default function EmbeddedStaff() {
       if (!response.ok) {
         setError(data.error || 'Failed to create account');
       } else {
-        setMessage(`Account created. Share the email + temporary password with your staff - they log in at shopify.fusenv.com and set their own password.`);
+        setMessage(`Account created. Share the email + temporary password with your staff - they log in at inventory-reload.fusenv.com and set their own password.`);
         setEmail('');
         setPassword('');
         loadUsers();
@@ -72,7 +72,7 @@ export default function EmbeddedStaff() {
         <h1 className="text-2xl font-bold text-gray-900 mb-2">Staff accounts</h1>
         <p className="text-sm text-gray-500 mb-4">
           Staff photograph discs from their phones at{' '}
-          <span className="font-mono">shopify.fusenv.com</span>. They can't manage
+          <span className="font-mono">inventory-reload.fusenv.com</span>. They can't manage
           your store or other settings.
         </p>
 
