@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifySessionToken, shopFromSessionToken } from '@/lib/auth/session-token';
 import { provisionShopConnection } from '@/lib/db/shopify-connection';
 import { shopifyGraphql } from '@/lib/shopify/graphql';
+import { readTokenGrant } from '@/lib/shopify/token';
 import { getLogger } from '@/lib/logger';
 
 const log = getLogger('api/auth/shopify/token-exchange');
@@ -33,7 +34,10 @@ export async function POST(request: NextRequest) {
         grant_type: 'urn:ietf:params:oauth:grant-type:token-exchange',
         subject_token: sessionToken,
         subject_token_type: 'urn:ietf:params:oauth:token-type:id_token',
-        requested_token_type: 'urn:shopify:params:oauth:token-type:offline-access-token'
+        requested_token_type: 'urn:shopify:params:oauth:token-type:offline-access-token',
+        // Non-expiring offline tokens are rejected by the Admin API; ask for
+        // the expiring pair (1h access token + 90d refresh token).
+        expiring: '1'
       })
     });
 
@@ -43,11 +47,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Token exchange failed' }, { status: 502 });
     }
 
-    const tokenData = await exchangeResponse.json() as { access_token: string; scope: string };
+    const grant = readTokenGrant(await exchangeResponse.json());
+    if (!grant.tokenExpiresAt) {
+      log.error(`Token exchange for ${shop} returned a non-expiring token`);
+      return NextResponse.json({ error: 'Token exchange failed' }, { status: 502 });
+    }
 
     // Shop.primaryLocation was removed from the Admin API; take the first
     // active location that stocks inventory (falling back to the first active).
-    const locationData = await shopifyGraphql(shop, tokenData.access_token, `
+    const locationData = await shopifyGraphql(shop, grant.accessToken, `
       query InventoryLocations {
         locations(first: 10, includeInactive: false) {
           nodes { id name shipsInventory }
@@ -65,10 +73,13 @@ export async function POST(request: NextRequest) {
 
     const tenantId = provisionShopConnection({
       shop,
-      accessToken: tokenData.access_token,
-      scope: tokenData.scope,
+      accessToken: grant.accessToken,
+      scope: grant.scope,
       locationId,
-      connectedBy: `shopify:${payload.sub}`
+      connectedBy: `shopify:${payload.sub}`,
+      tokenExpiresAt: grant.tokenExpiresAt,
+      refreshToken: grant.refreshToken,
+      refreshTokenExpiresAt: grant.refreshTokenExpiresAt
     });
 
     log.info(`Provisioned ${shop} (tenant ${tenantId}) via token exchange`);

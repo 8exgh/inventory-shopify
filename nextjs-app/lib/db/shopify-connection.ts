@@ -10,6 +10,10 @@ export interface ShopifyConnection {
   connected_by_user_id: string;
   connected_at: number;
   status: 'connected' | 'disconnected';
+  // Offline tokens expire (1h) and are renewed with the refresh token (90d).
+  token_expires_at: number | null;
+  refresh_token: string | null;
+  refresh_token_expires_at: number | null;
 }
 
 export function getShopifyConnection(tenantId: string): ShopifyConnection | null {
@@ -45,6 +49,9 @@ export function provisionShopConnection(params: {
   scope: string;
   locationId: string;
   connectedBy: string;
+  tokenExpiresAt: number;
+  refreshToken: string | null;
+  refreshTokenExpiresAt: number | null;
 }): string {
   const db = getSystemDb();
   const existing = getShopifyConnectionByShop(params.shop);
@@ -55,8 +62,11 @@ export function provisionShopConnection(params: {
       db.prepare('INSERT INTO tenants (id, created_at) VALUES (?, ?)').run(tenantId, Date.now());
     }
     db.prepare(`
-      INSERT INTO shopify_connections (tenant_id, shop, access_token, scope, location_id, connected_by_user_id, connected_at, status)
-      VALUES (?, ?, ?, ?, ?, ?, ?, 'connected')
+      INSERT INTO shopify_connections (
+        tenant_id, shop, access_token, scope, location_id, connected_by_user_id,
+        connected_at, status, token_expires_at, refresh_token, refresh_token_expires_at
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, 'connected', ?, ?, ?)
       ON CONFLICT(tenant_id) DO UPDATE SET
         shop = excluded.shop,
         access_token = excluded.access_token,
@@ -64,7 +74,10 @@ export function provisionShopConnection(params: {
         location_id = excluded.location_id,
         connected_by_user_id = excluded.connected_by_user_id,
         connected_at = excluded.connected_at,
-        status = 'connected'
+        status = 'connected',
+        token_expires_at = excluded.token_expires_at,
+        refresh_token = excluded.refresh_token,
+        refresh_token_expires_at = excluded.refresh_token_expires_at
     `).run(
       tenantId,
       params.shop,
@@ -72,7 +85,10 @@ export function provisionShopConnection(params: {
       params.scope,
       params.locationId,
       params.connectedBy,
-      Date.now()
+      Date.now(),
+      params.tokenExpiresAt,
+      params.refreshToken,
+      params.refreshTokenExpiresAt
     );
   })();
 
@@ -87,41 +103,24 @@ export function markShopDisconnected(shop: string): boolean {
   return result.changes > 0;
 }
 
-// A shop may be actively connected by only one tenant (enforced by the
-// partial unique index; this check gives the OAuth callback a friendly error).
-export function isShopConnectedByOtherTenant(shop: string, tenantId: string): boolean {
+// Persists a rotated token pair after a refresh_token grant.
+export function updateConnectionTokens(params: {
+  tenantId: string;
+  accessToken: string;
+  tokenExpiresAt: number;
+  refreshToken: string | null;
+  refreshTokenExpiresAt: number | null;
+}): void {
   const db = getSystemDb();
-  const row = db.prepare(
-    `SELECT 1 FROM shopify_connections WHERE shop = ? AND status = 'connected' AND tenant_id != ?`
-  ).get(shop, tenantId);
-  return row !== undefined;
-}
-
-export function saveShopifyConnection(
-  tenantId: string,
-  connection: Omit<ShopifyConnection, 'tenant_id' | 'connected_at' | 'status'>
-): void {
-  const db = getSystemDb();
-  // One row per tenant: re-authorizing (rotation, or even a different shop)
-  // simply overwrites the connection.
   db.prepare(`
-    INSERT INTO shopify_connections (tenant_id, shop, access_token, scope, location_id, connected_by_user_id, connected_at, status)
-    VALUES (?, ?, ?, ?, ?, ?, ?, 'connected')
-    ON CONFLICT(tenant_id) DO UPDATE SET
-      shop = excluded.shop,
-      access_token = excluded.access_token,
-      scope = excluded.scope,
-      location_id = excluded.location_id,
-      connected_by_user_id = excluded.connected_by_user_id,
-      connected_at = excluded.connected_at,
-      status = 'connected'
+    UPDATE shopify_connections
+       SET access_token = ?, token_expires_at = ?, refresh_token = ?, refresh_token_expires_at = ?
+     WHERE tenant_id = ?
   `).run(
-    tenantId,
-    connection.shop,
-    connection.access_token,
-    connection.scope,
-    connection.location_id,
-    connection.connected_by_user_id,
-    Date.now()
+    params.accessToken,
+    params.tokenExpiresAt,
+    params.refreshToken,
+    params.refreshTokenExpiresAt,
+    params.tenantId
   );
 }

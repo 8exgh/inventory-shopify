@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth/middleware';
 import { createShopifyClient } from '@/lib/shopify/client';
-import { getShopifyConnection } from '@/lib/db/shopify-connection';
+import { connectionWithFreshToken } from '@/lib/shopify/token';
 import { getLogger } from '@/lib/logger';
 
 const log = getLogger('api/queries/shopify-products');
@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Get the tenant's store connection
-    const connection = getShopifyConnection(auth.tenantId);
+    const connection = await connectionWithFreshToken(auth.tenantId);
     if (!connection) {
       return NextResponse.json(
         { error: 'Shopify not connected', code: 'SHOPIFY_NOT_CONNECTED' },

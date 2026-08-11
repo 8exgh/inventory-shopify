@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireApiKey } from '@/lib/auth/middleware';
-import { getConnectedShopifyConnections } from '@/lib/db/shopify-connection';
+import { connectionsWithFreshTokens } from '@/lib/shopify/token';
 import { getLogger } from '@/lib/logger';
 
 const log = getLogger('api/queries/shopify-connections');
@@ -25,7 +25,9 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const connections = getConnectedShopifyConnections().map(connection => ({
+    // Tokens are short-lived, so hand the processor freshly renewed ones on
+    // every poll rather than whatever was minted at install time.
+    const connections = (await connectionsWithFreshTokens()).map(connection => ({
       tenantId: connection.tenant_id,
       accessToken: connection.access_token,
       shop: connection.shop,

@@ -1,5 +1,6 @@
 import { getSystemDb } from '@/lib/db/system';
-import { getShopifyConnection, ShopifyConnection } from '@/lib/db/shopify-connection';
+import { ShopifyConnection } from '@/lib/db/shopify-connection';
+import { connectionWithFreshToken } from '@/lib/shopify/token';
 import { shopifyGraphql, fromGid } from '@/lib/shopify/graphql';
 import { getLogger } from '@/lib/logger';
 
@@ -92,7 +93,8 @@ export async function getSubscriptionStatus(tenantId: string, forceRefresh = fal
     return { subscribed: true, status: 'unenforced', trialEndsAt: null };
   }
 
-  const connection = getShopifyConnection(tenantId);
+  // fetchShopNumericId below hits the Admin API, so the token must be live.
+  const connection = await connectionWithFreshToken(tenantId);
   if (!connection) {
     return { subscribed: false, status: 'none', trialEndsAt: null };
   }

@@ -69,7 +69,10 @@ function initializeSystemDb(db: Database.Database): void {
       shop_numeric_id TEXT,
       subscription_status TEXT,
       trial_ends_at TEXT,
-      subscription_checked_at INTEGER
+      subscription_checked_at INTEGER,
+      token_expires_at INTEGER,
+      refresh_token TEXT,
+      refresh_token_expires_at INTEGER
     );
 
     CREATE UNIQUE INDEX IF NOT EXISTS idx_connections_shop_active

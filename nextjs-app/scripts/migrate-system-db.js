@@ -77,6 +77,38 @@ const MIGRATIONS = [
       }
     }
   }
+,
+  {
+    // Shopify stopped accepting non-expiring offline tokens on the Admin API
+    // ("[API] Non-expiring access tokens are no longer accepted"), so every
+    // connection now carries an expiry and a refresh token.
+    id: '003-expiring-offline-tokens',
+    run(db) {
+      const table = db.prepare(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='shopify_connections'"
+      ).get();
+      if (!table) {
+        return; // fresh database: app DDL creates the full schema
+      }
+      const columns = db.prepare('PRAGMA table_info(shopify_connections)').all().map(c => c.name);
+      for (const [name, type] of [
+        ['token_expires_at', 'INTEGER'],
+        ['refresh_token', 'TEXT'],
+        ['refresh_token_expires_at', 'INTEGER']
+      ]) {
+        if (!columns.includes(name)) {
+          db.exec(`ALTER TABLE shopify_connections ADD COLUMN ${name} ${type}`);
+        }
+      }
+      // Tokens minted before this change are non-expiring and already
+      // rejected by Shopify. Leaving them in place would keep the processor
+      // hammering a dead token; clearing the expiry marks them for renewal
+      // on the merchant's next embedded load (token exchange re-provisions).
+      db.prepare(
+        `UPDATE shopify_connections SET token_expires_at = 0 WHERE token_expires_at IS NULL`
+      ).run();
+    }
+  }
 ];
 
 function main() {
