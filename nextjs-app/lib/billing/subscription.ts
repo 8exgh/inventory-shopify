@@ -1,25 +1,34 @@
 import { getSystemDb } from '@/lib/db/system';
-import { ShopifyConnection } from '@/lib/db/shopify-connection';
 import { connectionWithFreshToken } from '@/lib/shopify/token';
-import { shopifyGraphql, fromGid } from '@/lib/shopify/graphql';
+import { shopifyGraphql } from '@/lib/shopify/graphql';
 import { getLogger } from '@/lib/logger';
 
 const log = getLogger('billing/subscription');
 
-// Subscription state via Shopify App Pricing: Shopify hosts plan selection
-// and charging; the app only needs to know whether the shop currently has
-// an active subscription (which includes the 14-day trial period).
+// Subscription state via Shopify App Pricing: Shopify hosts plan selection,
+// charging, and upgrades/downgrades, so the app only needs to know whether
+// the shop currently has an active subscription (the trial counts as active).
 //
-// Status is read from the Partner API and cached on the connection row.
-// Design choices:
-// - Billing disabled entirely when SHOPIFY_PARTNER_API_TOKEN is unset
-//   (development / pre-enrollment) - everything reads as subscribed.
-// - Fail-open on Partner API errors so an outage never locks out a paying
-//   merchant; the cache keeps normal traffic off the Partner API.
-// NOTE: the Partner API activeSubscription schema should be re-verified on
-// the first live check after App Pricing enrollment.
+// Status comes from the shop's own Admin API through currentAppInstallation,
+// which needs nothing beyond the offline token we already hold - no Partner
+// API token, no shop id lookup. Results are cached on the connection row.
+// Fail-open on API errors so an outage never locks out a paying merchant.
 
 const CACHE_TTL_MS = 60 * 60 * 1000;
+
+const ACTIVE_SUBSCRIPTIONS = `
+  query ActiveSubscriptions {
+    currentAppInstallation {
+      activeSubscriptions {
+        id
+        name
+        status
+        trialDays
+        createdAt
+      }
+    }
+  }
+`;
 
 export interface SubscriptionStatus {
   subscribed: boolean;
@@ -27,73 +36,33 @@ export interface SubscriptionStatus {
   trialEndsAt: string | null;
 }
 
+// Billing is only enforced once App Pricing plans exist for the app; leaving
+// this unset in development treats every shop as subscribed.
 function billingEnforced(): boolean {
-  return !!process.env.SHOPIFY_PARTNER_API_TOKEN;
+  return process.env.SHOPIFY_BILLING_ENFORCED === 'true';
 }
 
 export function pricingPlansUrl(shop: string): string {
   const storeHandle = shop.replace('.myshopify.com', '');
-  const appHandle = process.env.SHOPIFY_APP_HANDLE || 'disc-golf-inventory';
+  const appHandle = process.env.SHOPIFY_APP_HANDLE || 'inventory-reload';
   return `https://admin.shopify.com/store/${storeHandle}/charges/${appHandle}/pricing_plans`;
 }
 
-async function fetchShopNumericId(connection: ShopifyConnection): Promise<string> {
-  const data = await shopifyGraphql(connection.shop, connection.access_token, `
-    query ShopId { shop { id } }
-  `);
-  return fromGid(data.shop.id);
+function trialEnd(subscription: { trialDays?: number; createdAt?: string }): string | null {
+  if (!subscription.trialDays || !subscription.createdAt) return null;
+  const created = new Date(subscription.createdAt).getTime();
+  if (Number.isNaN(created)) return null;
+  return new Date(created + subscription.trialDays * 24 * 60 * 60 * 1000).toISOString();
 }
 
-async function queryPartnerApi(shopNumericId: string): Promise<{ active: boolean; trialEndsAt: string | null }> {
-  const orgId = process.env.SHOPIFY_PARTNER_ORG_ID;
-  const appId = process.env.SHOPIFY_PARTNER_APP_ID;
-  const token = process.env.SHOPIFY_PARTNER_API_TOKEN!;
-
-  const response = await fetch(`https://partners.shopify.com/${orgId}/api/2024-10/graphql.json`, {
-    method: 'POST',
-    headers: {
-      'X-Shopify-Access-Token': token,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      query: `
-        query ActiveSubscription($appId: ID!, $shopId: ID!) {
-          app(id: $appId) {
-            activeSubscription(shopId: $shopId) {
-              trialEndsAt
-            }
-          }
-        }
-      `,
-      variables: {
-        appId: `gid://partners/App/${appId}`,
-        shopId: `gid://partners/Shop/${shopNumericId}`
-      }
-    })
-  });
-
-  if (!response.ok) {
-    throw new Error(`Partner API ${response.status}: ${await response.text()}`);
-  }
-
-  const body = await response.json() as any;
-  if (body.errors?.length) {
-    throw new Error(`Partner API errors: ${body.errors.map((e: any) => e.message).join('; ')}`);
-  }
-
-  const subscription = body.data?.app?.activeSubscription;
-  return {
-    active: !!subscription,
-    trialEndsAt: subscription?.trialEndsAt ?? null
-  };
-}
-
-export async function getSubscriptionStatus(tenantId: string, forceRefresh = false): Promise<SubscriptionStatus> {
+export async function getSubscriptionStatus(
+  tenantId: string,
+  forceRefresh = false
+): Promise<SubscriptionStatus> {
   if (!billingEnforced()) {
     return { subscribed: true, status: 'unenforced', trialEndsAt: null };
   }
 
-  // fetchShopNumericId below hits the Admin API, so the token must be live.
   const connection = await connectionWithFreshToken(tenantId);
   if (!connection) {
     return { subscribed: false, status: 'none', trialEndsAt: null };
@@ -102,7 +71,9 @@ export async function getSubscriptionStatus(tenantId: string, forceRefresh = fal
   const db = getSystemDb();
   const cached = db.prepare(
     'SELECT subscription_status, trial_ends_at, subscription_checked_at FROM shopify_connections WHERE tenant_id = ?'
-  ).get(tenantId) as { subscription_status: string | null; trial_ends_at: string | null; subscription_checked_at: number | null } | undefined;
+  ).get(tenantId) as
+    | { subscription_status: string | null; trial_ends_at: string | null; subscription_checked_at: number | null }
+    | undefined;
 
   const fresh = cached?.subscription_checked_at
     && Date.now() - cached.subscription_checked_at < CACHE_TTL_MS;
@@ -116,26 +87,21 @@ export async function getSubscriptionStatus(tenantId: string, forceRefresh = fal
   }
 
   try {
-    let shopNumericId = (db.prepare(
-      'SELECT shop_numeric_id FROM shopify_connections WHERE tenant_id = ?'
-    ).get(tenantId) as { shop_numeric_id: string | null } | undefined)?.shop_numeric_id;
-
-    if (!shopNumericId) {
-      shopNumericId = await fetchShopNumericId(connection);
-      db.prepare('UPDATE shopify_connections SET shop_numeric_id = ? WHERE tenant_id = ?')
-        .run(shopNumericId, tenantId);
-    }
-
-    const result = await queryPartnerApi(shopNumericId);
-    const status = result.active ? 'active' : 'none';
+    const data = await shopifyGraphql(connection.shop, connection.access_token, ACTIVE_SUBSCRIPTIONS);
+    const subscriptions: Array<{ status: string; trialDays: number; createdAt: string }> =
+      data.currentAppInstallation?.activeSubscriptions || [];
+    const active = subscriptions.find(s => s.status === 'ACTIVE');
+    const status = active ? 'active' : 'none';
+    const trialEndsAt = active ? trialEnd(active) : null;
 
     db.prepare(`
       UPDATE shopify_connections
       SET subscription_status = ?, trial_ends_at = ?, subscription_checked_at = ?
       WHERE tenant_id = ?
-    `).run(status, result.trialEndsAt, Date.now(), tenantId);
+    `).run(status, trialEndsAt, Date.now(), tenantId);
 
-    return { subscribed: result.active, status, trialEndsAt: result.trialEndsAt };
+    log.debug(`Subscription for ${connection.shop}: ${status}`);
+    return { subscribed: !!active, status, trialEndsAt };
   } catch (error: any) {
     log.warn(`Subscription check failed for tenant ${tenantId} - failing open`, error);
     return {
