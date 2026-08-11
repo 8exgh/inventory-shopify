@@ -4,7 +4,7 @@ import { BuildInfoFooter } from '@/components/BuildInfoFooter'
 import { FeedbackFooter } from '@/components/FeedbackFooter'
 
 export const metadata: Metadata = {
-  title: 'Disc Golf Inventory Manager',
+  title: 'DiscReload',
   description: 'Shopify inventory management for disc golf products',
 }
 

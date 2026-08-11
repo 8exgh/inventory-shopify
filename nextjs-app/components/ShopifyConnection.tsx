@@ -87,7 +87,7 @@ export function ShopifyConnection({ role, onConnectionChange }: ShopifyConnectio
       </div>
       <p className="text-sm text-gray-500">
         {role === 'admin'
-          ? 'Install (or reinstall) Disc Golf Inventory from the Shopify App Store, then open it once in your Shopify admin.'
+          ? 'Install (or reinstall) DiscReload from the Shopify App Store, then open it once in your Shopify admin.'
           : 'Waiting for your store admin to install the app from the Shopify App Store.'}
       </p>
     </div>

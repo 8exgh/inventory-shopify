@@ -34,7 +34,7 @@ export function Header() {
       <div className="max-w-7xl mx-auto flex justify-between items-center">
         <span className="flex items-center gap-2">
           <img src="/logo.svg" alt="" className="h-7 w-7" />
-          <span className="text-lg font-semibold text-gray-900">Disc Golf Inventory</span>
+          <span className="text-lg font-semibold text-gray-900">DiscReload</span>
         </span>
         {shopUrl && (
           <a

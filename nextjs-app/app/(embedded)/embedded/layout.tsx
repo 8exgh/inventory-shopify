@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import '../../globals.css'
 
 export const metadata: Metadata = {
-  title: 'Disc Golf Inventory',
+  title: 'DiscReload',
 }
 
 // Root layout for the embedded (Shopify admin) surface. App Bridge must be

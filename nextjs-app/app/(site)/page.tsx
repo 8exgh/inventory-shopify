@@ -57,11 +57,11 @@ export default function Home() {
       <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-8">
         <img
           src="/logo.svg"
-          alt="Disc Golf Inventory"
+          alt="DiscReload"
           className="mx-auto mb-4 h-16 w-16"
         />
         <h1 className="text-3xl font-bold text-center mb-8 text-gray-800">
-          Disc Golf Inventory
+          DiscReload
         </h1>
 
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -113,7 +113,7 @@ export default function Home() {
             Staff accounts are created by your store admin inside the app.
           </p>
           <p className="mt-2">
-            New here? Install <span className="font-medium">Disc Golf Inventory</span> from
+            New here? Install <span className="font-medium">DiscReload</span> from
             the Shopify App Store to get started.
           </p>
         </div>

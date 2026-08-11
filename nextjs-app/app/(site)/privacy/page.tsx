@@ -3,13 +3,13 @@ export default function PrivacyPolicy() {
   return (
     <div className="max-w-3xl mx-auto p-6 prose-sm">
       <h1 className="text-3xl font-bold text-gray-900 mb-2">Privacy Policy</h1>
-      <p className="text-sm text-gray-500 mb-8">Disc Golf Inventory &mdash; last updated August 2026</p>
+      <p className="text-sm text-gray-500 mb-8">DiscReload &mdash; last updated August 2026</p>
 
       <div className="space-y-6 text-gray-700 text-sm leading-6">
         <section>
           <h2 className="text-lg font-semibold text-gray-900 mb-2">What we collect</h2>
           <p>
-            Disc Golf Inventory stores the minimum needed to run the app for your store:
+            DiscReload stores the minimum needed to run the app for your store:
             your store's domain, an API access token scoped to products, inventory, files
             and locations, the disc photos and product details your team submits, and the
             email addresses of staff accounts you create. We do not collect, access, or

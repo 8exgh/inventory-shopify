@@ -1,4 +1,4 @@
-# App Store submission package — Disc Golf Inventory
+# App Store submission package — DiscReload
 
 Everything needed to take the app from "code complete" to "submitted for review."
 Code phases (GraphQL, embedded app, compliance webhooks, billing gate) are done;
@@ -8,7 +8,7 @@ what remains is CLI config deploy + dashboard work, which requires your logins.
 
 1. **Distribution check**: dev.shopify.com/dashboard → the app → Distribution.
    - If custom distribution was already locked in (the disctopiaco fix), create a
-     **new app** ("Disc Golf Inventory") and use its client id/secret everywhere
+     **new app** ("DiscReload") and use its client id/secret everywhere
      below; update the two GitHub secrets (`SHOPIFY_SEAN_SHOPIFY_CLIENT_ID/SECRET`)
      and the `client_id` in `shopify.app.toml`, then redeploy.
    - If distribution is still unset, the existing app can be made public.
@@ -45,7 +45,7 @@ and lands them on `/embedded/welcome` afterward.
 
 ## 2. Listing content (paste-ready)
 
-- **App name**: `Disc Golf Inventory` (matches shopify.app.toml — required)
+- **App name**: `DiscReload` (matches shopify.app.toml — required)
 - **App introduction** (≤100 chars):
   `Photograph one-of-a-kind discs and list them as variants with color, weight and foil details.`
 - **App details** (≤500 chars):

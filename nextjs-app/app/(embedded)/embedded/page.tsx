@@ -81,7 +81,7 @@ export default function EmbeddedDashboard() {
         <div className="max-w-md w-full bg-white rounded-lg shadow p-8 text-center">
           <h1 className="text-2xl font-bold text-gray-900 mb-3">Choose your plan</h1>
           <p className="text-sm text-gray-500 mb-6">
-            Disc Golf Inventory is $9/month with a 14-day free trial. Pick your
+            DiscReload is $9/month with a 14-day free trial. Pick your
             plan to start photographing discs.
           </p>
           <button
@@ -98,7 +98,7 @@ export default function EmbeddedDashboard() {
   return (
     <div className="max-w-5xl mx-auto p-4">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Disc Golf Inventory</h1>
+        <h1 className="text-2xl font-bold text-gray-900">DiscReload</h1>
         <div className="space-x-3">
           <Link
             href="/embedded/create"

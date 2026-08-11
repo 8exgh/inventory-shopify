@@ -3,7 +3,7 @@
 # the Dev Disc Golf org could not be distributed publicly.
 
 client_id = "7d64b85443b93189f1911020e5163b01"
-name = "Disc Golf Inventory"
+name = "DiscReload"
 application_url = "https://inventory-reload.fusenv.com/embedded"
 embedded = true
 
