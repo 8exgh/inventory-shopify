@@ -15,6 +15,10 @@ const log = getLogger('billing/subscription');
 // Fail-open on API errors so an outage never locks out a paying merchant.
 
 const CACHE_TTL_MS = 60 * 60 * 1000;
+// "No subscription" is the state that blocks the merchant and the one that
+// flips the moment they approve a plan, so it is only ever cached briefly -
+// otherwise someone who just paid keeps seeing the plan picker.
+const NEGATIVE_CACHE_TTL_MS = 30 * 1000;
 
 const ACTIVE_SUBSCRIPTIONS = `
   query ActiveSubscriptions {
@@ -75,8 +79,9 @@ export async function getSubscriptionStatus(
     | { subscription_status: string | null; trial_ends_at: string | null; subscription_checked_at: number | null }
     | undefined;
 
+  const ttl = cached?.subscription_status === 'active' ? CACHE_TTL_MS : NEGATIVE_CACHE_TTL_MS;
   const fresh = cached?.subscription_checked_at
-    && Date.now() - cached.subscription_checked_at < CACHE_TTL_MS;
+    && Date.now() - cached.subscription_checked_at < ttl;
 
   if (fresh && !forceRefresh && cached?.subscription_status) {
     return {

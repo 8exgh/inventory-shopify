@@ -26,7 +26,12 @@ export default function EmbeddedDashboard() {
     try {
       await ensureProvisioned();
 
-      const subResponse = await embeddedFetch('/api/queries/subscription-status');
+      // Shopify sends the merchant back here with charge_id right after they
+      // approve a plan, so skip the cached status on that first load.
+      const justApproved = new URLSearchParams(window.location.search).has('charge_id');
+      const subResponse = await embeddedFetch(
+        `/api/queries/subscription-status${justApproved ? '?refresh=1' : ''}`
+      );
       if (subResponse.ok) {
         const sub = await subResponse.json();
         if (!sub.subscribed) {
