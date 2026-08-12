@@ -54,6 +54,124 @@ Once a weight is entered, the variant can be created.
 - Unique variant generation with weight tracking
 - Retry logic for failed Shopify operations (up to 5 attempts)
 
+## Flows
+
+### Install & authentication (managed install + token exchange)
+
+A merchant installs from the Shopify App Store; there is no OAuth redirect and
+no shop-domain prompt. The embedded page loads App Bridge, gets a session
+token, and exchanges it for an **expiring** offline token. The tenant is the
+shop, so a reinstall reattaches to existing data.
+
+```mermaid
+sequenceDiagram
+    participant M as Merchant
+    participant Admin as Shopify admin (iframe)
+    participant AB as App Bridge
+    participant App as Next.js app
+    participant S as Shopify OAuth
+
+    M->>Admin: Install / open DiscReload
+    Admin->>App: load /embedded (iframe)
+    App->>AB: app-bridge.js (first script)
+    AB-->>App: window.shopify.idToken()
+    App->>App: POST /api/auth/shopify/token-exchange (Bearer session token)
+    App->>S: token exchange (expiring: 1)
+    S-->>App: access_token (1h) + refresh_token (90d)
+    App->>S: GraphQL locations query
+    S-->>App: stocking location
+    App->>App: provisionShopConnection (tenant = shop)
+    App-->>Admin: dashboard renders
+```
+
+### Expiring offline token refresh
+
+The Admin API rejects non-expiring tokens, so every caller — embedded queries
+and the background processor alike — goes through `connectionWithFreshToken`,
+which renews from the refresh token before the access token expires.
+
+```mermaid
+sequenceDiagram
+    participant C as Caller (embedded query / processor)
+    participant T as validAccessToken()
+    participant DB as system.db
+    participant S as Shopify OAuth
+
+    C->>T: connectionWithFreshToken(tenantId)
+    T->>DB: read connection
+    alt token still valid
+        T-->>C: cached access_token
+    else expired (or within 5-min skew)
+        T->>S: grant_type=refresh_token
+        S-->>T: new access_token + refresh_token
+        T->>DB: updateConnectionTokens
+        T-->>C: fresh access_token
+    end
+```
+
+### Add a disc → Shopify variant
+
+Staff photograph a disc; two background phases run off the event store. Colour
+estimation and image processing happen right after intake, and the Shopify
+variant is created once a weight and description are submitted.
+
+```mermaid
+sequenceDiagram
+    participant Staff
+    participant App as Next.js app
+    participant ES as Event store (tenant.db)
+    participant BP as Background processor
+    participant S as Shopify Admin API
+
+    Staff->>App: POST begin-create-product (photo)
+    App->>App: auth + subscription gate
+    App->>ES: event (status: data-entry)
+
+    Note over BP: poll cycle (~5s)
+    BP->>S: estimate colour from photo
+    BP->>BP: centre disc + remove background
+    BP->>ES: photo processed, colour set
+
+    Staff->>App: POST finish-create-product (weight + description)
+    App->>ES: event (status: creating)
+
+    Note over BP: next poll cycle
+    BP->>App: GET shopify-connections (fresh tokens)
+    BP->>S: productVariantsBulkCreate + media (qty 1)
+    S-->>BP: variant created
+    BP->>ES: event (status: created)
+```
+
+### Billing gate (Shopify App Pricing)
+
+Shopify hosts plan selection and charging; the app only reads whether the shop
+has an active subscription (the trial counts as active) from its own Admin API.
+The blocking "none" answer is re-checked promptly so the gate opens as soon as
+the merchant approves a plan.
+
+```mermaid
+sequenceDiagram
+    participant M as Merchant
+    participant App as Next.js app
+    participant S as Shopify Admin API
+    participant P as Shopify App Pricing (hosted)
+
+    M->>App: open embedded app
+    App->>S: currentAppInstallation.activeSubscriptions
+    alt has active subscription
+        S-->>App: ACTIVE
+        App-->>M: dashboard
+    else none
+        S-->>App: (none)
+        App-->>M: "Choose your plan"
+        M->>P: select plan
+        P-->>App: redirect back with charge_id
+        App->>S: re-check (skip cache)
+        S-->>App: ACTIVE
+        App-->>M: dashboard
+    end
+```
+
 ## Getting Started
 
 ### Prerequisites
