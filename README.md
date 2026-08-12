@@ -1,5 +1,27 @@
 # Disc Golf Shopify Integration
 
+## Live test results — 2026-08-11
+
+Verified end-to-end against the running production app (`inventory-reload.fusenv.com`)
+by installing on a fresh dev store (`discreload-demo.myshopify.com`).
+
+| Check | Result |
+|---|---|
+| Fresh install on a dev store (managed install, no OAuth screen) | ✅ app opens embedded in Shopify admin |
+| Admin API call with expiring offline token | ✅ 200 (previously 403 on non-expiring token) |
+| Embedded surface loads products via session token | ✅ 18 products listed, no cookies/localStorage auth |
+| Billing gate — unsubscribed shop | ✅ shows "Choose your plan" |
+| Plan approval (Shopify App Pricing, test charge) | ✅ approves and returns to app |
+| Billing gate — after subscribing | ✅ app opens (cache no longer serves stale "none") |
+| Privacy policy URL | ✅ `https://inventory-reload.fusenv.com/privacy` → 200 |
+| Webhook endpoint with invalid HMAC | ✅ 401 |
+| Shopify AI self-review (`/shopify-app-store-review`) | ✅ no failing requirements |
+| Shopify embedded app checks (App Bridge + session tokens) | ✅ passed |
+| App Store submission | ✅ Submitted — awaiting reviewer |
+
+Released app version: `discreload-6`. See `docs/app-store/submission-guide.md`
+for the full submission state.
+
 A complete CQRS + Event Sourcing system for managing disc golf inventory on Shopify. Built with Next.js, TypeScript, SQLite, and follows the Adam Dymitruk / Martin Dilger event sourcing approach.
 
 ## Screenshot
